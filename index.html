@@ -1,8 +1,28 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Canal Watch Survey Schedule</title><link rel="stylesheet" href="styles.css"></head>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Canal Watch Survey Schedule</title>
+<link rel="stylesheet" href="styles.css">
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('embed') === '1') {
+    document.documentElement.classList.add('embedded-schedule');
+  }
+})();
+</script>
+</head>
 <body>
-<header class="site-header"><div class="wrap"><p class="eyebrow">Queen's Park Trust • Canal Watch</p><h1>Survey Schedule</h1><p class="lede">Upcoming water-quality surveys and volunteer/project-team coverage.</p></div></header>
+<header class="site-header" id="publicHeader">
+  <div class="wrap">
+    <p class="eyebrow">Queen's Park Trust • Canal Watch</p>
+    <h1>Survey Schedule</h1>
+    <p class="lede">Upcoming water-quality surveys and volunteer/project-team coverage.</p>
+  </div>
+</header>
+
 <main class="wrap">
 <section class="summary-grid">
 <article class="summary-card"><span>Next survey</span><strong id="nextSurvey">—</strong></article>
@@ -10,15 +30,70 @@
 <article class="summary-card"><span>Sites covered</span><strong id="coveredCount">0</strong></article>
 <article class="summary-card"><span>Uncovered sites</span><strong id="uncoveredCount">0</strong></article>
 </section>
-<section class="panel">
-<div class="panel-heading"><div><h2>Upcoming surveys</h2><p>View all upcoming surveys or choose one specific survey round.</p></div>
-<label class="filter">View<select id="roundFilter"><option>Loading…</option></select></label></div>
-<div id="publicMessage"></div>
-<div class="table-wrap"><table><thead><tr><th>Sampling site</th><th>Survey date</th><th>Assigned to</th><th>Status</th></tr></thead><tbody id="scheduleBody"><tr><td colspan="4">Loading schedule…</td></tr></tbody></table></div>
-</section>
 
+<section class="panel">
+<div class="panel-heading">
+  <div><h2>Upcoming surveys</h2><p>View all upcoming surveys or choose one specific survey round.</p></div>
+  <label class="filter">View<select id="roundFilter"><option>Loading…</option></select></label>
+</div>
+<div id="publicMessage"></div>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Sampling site</th>
+<th>Survey date</th>
+<th id="assignmentHeading">Assigned to</th>
+<th>Status</th>
+<th id="contactHeading" class="hidden">Contact</th>
+</tr>
+</thead>
+<tbody id="scheduleBody"><tr><td colspan="5">Loading schedule…</td></tr></tbody>
+</table>
+</div>
+</section>
 </main>
-<footer><div class="wrap">Canal Watch • Queen's Park Trust</div></footer>
+
+<footer id="publicFooter"><div class="wrap">Canal Watch • Queen's Park Trust</div></footer>
+
+<div class="modal-backdrop hidden" id="contactBackdrop">
+  <section class="modal contact-modal" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
+    <div class="modal-head">
+      <h2 id="contactTitle">Email coordinator</h2>
+      <button class="icon-btn" id="contactClose" aria-label="Close">×</button>
+    </div>
+
+    <form id="contactForm">
+      <input type="hidden" id="contactTeamId">
+      <p id="contactTeamLabel" class="muted"></p>
+
+      <div class="form-grid">
+        <label class="field">Your name
+          <input id="contactName" required>
+        </label>
+        <label class="field">Your email
+          <input id="contactEmail" type="email" required>
+        </label>
+      </div>
+
+      <label class="field" style="margin-top:14px">Subject
+        <input id="contactSubject" value="Canal Watch survey enquiry" required>
+      </label>
+
+      <label class="field" style="margin-top:14px">Message
+        <textarea id="contactMessage" rows="6" required></textarea>
+      </label>
+
+      <div id="contactStatus"></div>
+
+      <div class="modal-actions">
+        <button class="secondary" type="button" id="contactCancel">Cancel</button>
+        <button class="primary" type="submit" id="contactSend">Send email</button>
+      </div>
+    </form>
+  </section>
+</div>
+
 <script type="module" src="app.js"></script>
 
 <script>
@@ -29,7 +104,7 @@
       document.body ? document.body.scrollHeight : 0
     );
     window.parent.postMessage(
-      { type: 'canal-watch-survey-height', height: height },
+      { type: 'canal-watch-survey-height', height },
       '*'
     );
   }
@@ -41,18 +116,11 @@
     const observer = new ResizeObserver(reportHeight);
     observer.observe(document.documentElement);
     if (document.body) observer.observe(document.body);
-  } else if ('MutationObserver' in window) {
-    const observer = new MutationObserver(reportHeight);
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: true
-    });
   }
 
   setTimeout(reportHeight, 250);
   setTimeout(reportHeight, 1000);
 })();
 </script>
-
-</body></html>
+</body>
+</html>

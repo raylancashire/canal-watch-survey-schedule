@@ -1,2 +1,0 @@
-[functions.manage-admins]
-verify_jwt = true
