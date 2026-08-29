@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Canal Watch Survey Schedule</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <p class="eyebrow">Queen's Park Trust • Canal Watch</p>
+    <h1>Survey Schedule</h1>
+    <p class="lede">Upcoming water-quality survey rounds and assigned project teams or individual volunteers.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="summary-grid">
+    <article class="summary-card"><span>Next survey</span><strong id="nextSurvey">—</strong></article>
+    <article class="summary-card"><span>Sites scheduled</span><strong id="siteCount">0</strong></article>
+    <article class="summary-card"><span>Sites covered</span><strong id="coveredCount">0</strong></article>
+    <article class="summary-card"><span>Uncovered sites</span><strong id="uncoveredCount">0</strong></article>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <h2>Upcoming surveys</h2>
+        <p>Only assignment names are shown here. Email addresses and other user details remain private.</p>
+      </div>
+      <label class="filter">View
+        <select id="roundFilter"></select>
+      </label>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Sampling site</th><th>Survey date</th><th>Assigned to</th><th>Status</th></tr></thead>
+        <tbody id="scheduleBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="admin-link"><a href="admin.html">Coordinator sign-in / administration</a></p>
+</main>
+
+<footer><div class="wrap">Canal Watch • Queen's Park Trust</div></footer>
+<script src="app.js"></script>
+</body>
+</html>
