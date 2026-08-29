@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Canal Watch Volunteer Survey Portal</title>
+  <link rel="stylesheet" href="styles.css">
+
+  <style>
+    .volunteer-shell {
+      width: min(980px, 92%);
+      margin: 28px auto;
+    }
+
+    .volunteer-header {
+      background: #173d2b;
+      color: #fff;
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+
+    .volunteer-header h1 {
+      margin: 0 0 6px;
+      font-size: clamp(1.7rem, 4vw, 2.5rem);
+    }
+
+    .volunteer-header p {
+      margin: 0;
+      color: #edf5ef;
+    }
+
+    .volunteer-card {
+      background: #fff;
+      border: 1px solid #dce6df;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 3px 12px rgba(20,50,35,.06);
+    }
+
+    .volunteer-card h2 {
+      margin-top: 0;
+    }
+
+    .login-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .login-row label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-weight: 700;
+      font-size: .88rem;
+    }
+
+    .login-row input {
+      min-height: 44px;
+    }
+
+    .volunteer-button {
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 15px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      background: #19623d;
+      color: #fff;
+    }
+
+    .volunteer-button.secondary {
+      background: #e7efe9;
+      color: #214c34;
+    }
+
+    .volunteer-button.danger {
+      background: #f5e7e7;
+      color: #7a2929;
+    }
+
+    .volunteer-button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .portal-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .portal-toolbar p {
+      margin: 0;
+    }
+
+    .survey-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .survey-option {
+      border: 1px solid #dfe7e1;
+      border-radius: 12px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: center;
+      background: #fff;
+    }
+
+    .survey-option h3 {
+      margin: 0 0 4px;
+      font-size: 1.05rem;
+      color: #17321f;
+    }
+
+    .survey-meta {
+      margin: 0;
+      color: #627068;
+      font-size: .9rem;
+    }
+
+    .assigned-to-me {
+      border-color: #8fbea0;
+      background: #f1f8f3;
+    }
+
+    .my-badge {
+      display: inline-block;
+      margin-top: 7px;
+      border-radius: 999px;
+      padding: 4px 9px;
+      background: #d9f1e2;
+      color: #175c36;
+      font-size: .8rem;
+      font-weight: 700;
+    }
+
+    .notice-box {
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #eef7f0;
+      border: 1px solid #c9ddce;
+      margin: 12px 0;
+    }
+
+    .notice-box.error {
+      background: #fdecec;
+      border-color: #e9bcbc;
+      color: #7b2c2c;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 650px) {
+      .login-row,
+      .survey-option {
+        grid-template-columns: 1fr;
+      }
+
+      .survey-option .volunteer-button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="volunteer-shell">
+
+    <header class="volunteer-header">
+      <h1>Canal Watch Volunteer Portal</h1>
+      <p>Choose an upcoming survey site and assign yourself.</p>
+    </header>
+
+    <section class="volunteer-card" id="loginCard">
+      <h2>Volunteer sign in</h2>
+      <p>
+        Enter the email address registered with Canal Watch.
+        We will send you a secure sign-in link — no password is needed.
+      </p>
+
+      <form id="loginForm" class="login-row">
+        <label>
+          Email address
+          <input id="emailInput" type="email" autocomplete="email" required>
+        </label>
+
+        <button class="volunteer-button" type="submit" id="loginButton">
+          Email sign-in link
+        </button>
+      </form>
+
+      <div id="loginMessage"></div>
+    </section>
+
+    <section class="volunteer-card hidden" id="portalCard">
+
+      <div class="portal-toolbar">
+        <div>
+          <h2 style="margin:0 0 4px;">Upcoming surveys</h2>
+          <p id="signedInAs"></p>
+        </div>
+
+        <button class="volunteer-button secondary" id="signOutButton" type="button">
+          Sign out
+        </button>
+      </div>
+
+      <div id="portalMessage"></div>
+
+      <p>
+        Select <strong>Assign me</strong> beside a site you can cover.
+        You can also remove your own assignment later.
+      </p>
+
+      <div class="survey-list" id="surveyList">
+        <p>Loading upcoming surveys…</p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script type="module" src="volunteer.js"></script>
+</body>
+</html>
