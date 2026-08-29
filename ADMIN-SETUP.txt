@@ -1,0 +1,28 @@
+Administrator Management — deployment checklist
+
+1. SUPABASE SQL EDITOR
+   Run:
+   administrator-management-upgrade.sql
+
+2. SUPABASE EDGE FUNCTIONS
+   Create/deploy function named:
+   manage-admins
+
+   Source:
+   supabase/functions/manage-admins/index.ts
+
+3. AUTHENTICATION > URL CONFIGURATION
+   Add Redirect URL:
+   https://raylancashire.github.io/canal-watch-survey-schedule/admin.html
+
+4. GITHUB
+   Replace:
+   admin.html
+   admin.js
+
+5. TEST
+   Sign out and sign back in.
+   You should see a new "Administrators" tab.
+   Invite a test administrator.
+
+Do not put a service-role or secret key in GitHub.

@@ -6,7 +6,8 @@ const $=id=>document.getElementById(id);
 const fmtDate=v=>new Date(v+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
 const isoToday=()=>new Date().toISOString().slice(0,10);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let db={volunteers:[],teams:[],members:[],sites:[],rounds:[],roundSites:[],assignments:[],assignmentTeams:[],assignmentVolunteers:[]};
+let db={volunteers:[],teams:[],members:[],sites:[],rounds:[],roundSites:[],assignments:[],assignmentTeams:[],assignmentVolunteers:[],admins:[]};
+let currentAdmin=null;
 let modalSave=null;
 
 function message(el,text,error=false){el.innerHTML=text?`<div class="notice ${error?'error':''}">${esc(text)}</div>`:''}
@@ -28,19 +29,22 @@ async function login(e){
 async function checkSession(){
  const {data:{session}}=await supabase.auth.getSession();
  if(!session){$('loginView').classList.remove('hidden');$('adminView').classList.add('hidden');return}
- const {data:profile,error}=await supabase.from('admin_profiles').select('display_name,can_manage').eq('id',session.user.id).single();
- if(error||!profile?.can_manage){
+ const {data:profile,error}=await supabase.from('admin_profiles').select('id,display_name,email,can_manage,can_manage_admins,active').eq('id',session.user.id).single();
+ if(error||!profile?.active||!profile?.can_manage){
   $('loginView').classList.remove('hidden');$('adminView').classList.add('hidden');
   message($('loginMessage'),'This account is signed in but is not authorised to manage the schedule.',true);return;
  }
+ currentAdmin=profile;
  $('signedInAs').textContent=profile.display_name||session.user.email;
+ $('adminsTab').classList.toggle('hidden',!profile.can_manage_admins);
+ $('inviteAdminBtn')?.classList.toggle('hidden',!profile.can_manage_admins);
  $('loginView').classList.add('hidden');$('adminView').classList.remove('hidden');
  await generateRecurringRounds();
  await loadAll();
 }
 
 async function loadAll(){
- const qs=await Promise.all([
+ const requests=[
   supabase.from('volunteers').select('*').order('name'),
   supabase.from('project_teams').select('*').order('name'),
   supabase.from('project_team_members').select('*'),
@@ -50,9 +54,14 @@ async function loadAll(){
   supabase.from('site_assignments').select('*'),
   supabase.from('assignment_teams').select('*'),
   supabase.from('assignment_volunteers').select('*')
- ]);
+ ];
+ if(currentAdmin?.can_manage_admins){
+   requests.push(supabase.from('admin_profiles').select('id,display_name,email,can_manage,can_manage_admins,active,created_at').order('created_at'));
+ }
+ const qs=await Promise.all(requests);
  const err=qs.find(q=>q.error)?.error;if(err){alert(err.message);return}
- [db.volunteers,db.teams,db.members,db.sites,db.rounds,db.roundSites,db.assignments,db.assignmentTeams,db.assignmentVolunteers]=qs.map(q=>q.data||[]);
+ [db.volunteers,db.teams,db.members,db.sites,db.rounds,db.roundSites,db.assignments,db.assignmentTeams,db.assignmentVolunteers]=qs.slice(0,9).map(q=>q.data||[]);
+ db.admins=currentAdmin?.can_manage_admins?(qs[9]?.data||[]):[];
  render();
 }
 const volunteerName=id=>db.volunteers.find(x=>x.id===id)?.name||'Unknown volunteer';
@@ -67,6 +76,17 @@ function render(){
  $('roundList').innerHTML=db.rounds.map(r=>{const count=db.roundSites.filter(x=>x.survey_round_id===r.id).length;return record(r.name,`${fmtDate(r.survey_date)} • ${recurrenceLabel(r)}${r.auto_repeat?' • Auto-repeat':''} • ${count} site${count===1?'':'s'}`,r.status,`round:${r.id}`)}).join('');
  $('teamList').innerHTML=db.teams.map(t=>{const mem=db.members.filter(m=>m.team_id===t.id).map(m=>volunteerName(m.volunteer_id));return `<div class="record"><div><strong>${esc(t.name)}</strong><br><small>Coordinator: ${esc(volunteerName(t.coordinator_id))}</small><div class="assignment-summary">${mem.map(n=>`<span class="pill">${esc(n)}</span>`).join('')}</div></div><div>${mem.length} member${mem.length===1?'':'s'}</div><div>${t.active?'Active':'Inactive'}</div><div class="record-actions"><button class="secondary edit-team" data-id="${t.id}">Edit</button></div></div>`}).join('');
  $('assignmentList').innerHTML=db.assignments.map(a=>{const names=[...db.assignmentTeams.filter(x=>x.assignment_id===a.id).map(x=>teamName(x.team_id)),...db.assignmentVolunteers.filter(x=>x.assignment_id===a.id).map(x=>volunteerName(x.volunteer_id))];return `<div class="record"><div><strong>${esc(roundName(a.survey_round_id))} — ${esc(siteName(a.survey_site_id))}</strong><div class="assignment-summary">${names.length?names.map(n=>`<span class="pill">${esc(n)}</span>`).join(''):'No assignment'}</div></div><div>${a.status}</div><div></div><div class="record-actions"><button class="secondary edit-assignment" data-id="${a.id}">Edit</button><button class="danger delete-assignment" data-id="${a.id}">Delete</button></div></div>`}).join('');
+ if($('adminList')){
+   $('adminList').innerHTML=currentAdmin?.can_manage_admins
+     ? db.admins.map(a=>{
+         const isSelf=a.id===currentAdmin.id;
+         const access=a.active?(a.can_manage?'Schedule manager':'No schedule access'):'Disabled';
+         const manager=a.can_manage_admins?' • Admin Manager':'';
+         return `<div class="record"><div><strong>${esc(a.display_name||a.email||'Administrator')}</strong><br><small>${esc(a.email||'No email recorded')}</small></div><div>${esc(access+manager)}</div><div>${isSelf?'Your account':''}</div><div class="record-actions"><button class="secondary edit-admin" data-id="${a.id}">Permissions</button></div></div>`;
+       }).join('')
+     : '';
+ }
+
  bindRendered();
 }
 function record(title,meta,status,token){return `<div class="record"><div><strong>${esc(title)}</strong><br><small>${meta}</small></div><div>${status}</div><div></div><div class="record-actions"><button class="secondary edit-record" data-token="${token}">Edit</button></div></div>`}
@@ -75,11 +95,12 @@ function bindRendered(){
  document.querySelectorAll('.edit-team').forEach(b=>b.onclick=()=>openTeam(Number(b.dataset.id)));
  document.querySelectorAll('.edit-assignment').forEach(b=>b.onclick=()=>openAssignment(Number(b.dataset.id)));
  document.querySelectorAll('.delete-assignment').forEach(b=>b.onclick=()=>deleteAssignment(Number(b.dataset.id)));
+ document.querySelectorAll('.edit-admin').forEach(b=>b.onclick=()=>openAdminPermissions(b.dataset.id));
 }
 
 function setupTabs(){document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,.admin-section').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active')})}
 function setupButtons(){
- $('addVolunteerBtn').onclick=()=>openVolunteer(null);$('addSiteBtn').onclick=()=>openSite(null);$('addRoundBtn').onclick=()=>openRound(null);$('addTeamBtn').onclick=()=>openTeam(null);$('addAssignmentBtn').onclick=()=>openAssignment(null);
+ $('addVolunteerBtn').onclick=()=>openVolunteer(null);$('addSiteBtn').onclick=()=>openSite(null);$('addRoundBtn').onclick=()=>openRound(null);$('addTeamBtn').onclick=()=>openTeam(null);$('addAssignmentBtn').onclick=()=>openAssignment(null);if($('inviteAdminBtn'))$('inviteAdminBtn').onclick=openInviteAdmin;
 }
 function setupModal(){
  $('modalClose').onclick=closeModal;$('modalCancel').onclick=closeModal;$('modalSave').onclick=()=>modalSave&&modalSave();
@@ -168,6 +189,103 @@ async function generateRecurringRounds(){
      if(!error){const {data:sites}=await supabase.from('survey_round_sites').select('survey_site_id').eq('survey_round_id',previous.id);if(sites?.length){await supabase.from('survey_round_sites').insert(sites.map(s=>({survey_round_id:newRound.id,survey_site_id:s.survey_site_id})));await supabase.from('site_assignments').insert(sites.map(s=>({survey_round_id:newRound.id,survey_site_id:s.survey_site_id,status:'needed'})))}}
    }
  }
+}
+
+async function callAdminFunction(body){
+ const {data,error}=await supabase.functions.invoke('manage-admins',{body});
+ if(error){
+   let detail=error.message;
+   try{
+     if(error.context){
+       const payload=await error.context.json();
+       detail=payload?.error||detail;
+     }
+   }catch{}
+   throw new Error(detail);
+ }
+ if(data?.error) throw new Error(data.error);
+ return data;
+}
+
+function openInviteAdmin(){
+ if(!currentAdmin?.can_manage_admins)return;
+ openModal('Invite administrator',`
+   <div class="form-grid">
+     <label class="field">Name
+       <input id="adminInviteName" placeholder="Administrator name">
+     </label>
+     <label class="field">Email address
+       <input id="adminInviteEmail" type="email" placeholder="name@example.org">
+     </label>
+   </div>
+   <label class="inline-check">
+     <input id="adminInviteManageAdmins" type="checkbox">
+     Can manage other administrator accounts
+   </label>
+   <p class="help-text">The invited person will automatically receive schedule-management access. Admin-management access is optional.</p>
+ `,async()=>{
+   const display_name=$('adminInviteName').value.trim();
+   const email=$('adminInviteEmail').value.trim();
+   if(!email)return alert('Enter an email address.');
+   $('modalSave').disabled=true;
+   try{
+     await callAdminFunction({
+       action:'invite',
+       email,
+       display_name,
+       can_manage_admins:$('adminInviteManageAdmins').checked,
+       redirect_to:new URL('admin.html',window.location.href).href
+     });
+     closeModal();
+     await loadAll();
+     alert('Administrator invitation sent.');
+   }catch(e){
+     alert(e.message);
+   }finally{
+     $('modalSave').disabled=false;
+   }
+ });
+}
+
+function openAdminPermissions(id){
+ if(!currentAdmin?.can_manage_admins)return;
+ const a=db.admins.find(x=>x.id===id);
+ if(!a)return;
+ const isSelf=a.id===currentAdmin.id;
+ openModal('Administrator permissions',`
+   <p><strong>${esc(a.display_name||'Administrator')}</strong><br><span class="muted">${esc(a.email||'')}</span></p>
+   <label class="inline-check">
+     <input id="adminCanManage" type="checkbox" ${a.can_manage?'checked':''} ${isSelf?'disabled':''}>
+     Can manage the survey schedule
+   </label>
+   <label class="inline-check">
+     <input id="adminCanManageAdmins" type="checkbox" ${a.can_manage_admins?'checked':''} ${isSelf?'disabled':''}>
+     Can view, invite and manage administrators
+   </label>
+   <label class="inline-check">
+     <input id="adminActive" type="checkbox" ${a.active?'checked':''} ${isSelf?'disabled':''}>
+     Administrator account enabled
+   </label>
+   ${isSelf?'<p class="help-text">For safety, you cannot remove your own Admin Manager rights from this screen.</p>':''}
+ `,async()=>{
+   if(isSelf){closeModal();return}
+   $('modalSave').disabled=true;
+   try{
+     await callAdminFunction({
+       action:'update',
+       user_id:a.id,
+       can_manage:$('adminCanManage').checked,
+       can_manage_admins:$('adminCanManageAdmins').checked,
+       active:$('adminActive').checked
+     });
+     closeModal();
+     await loadAll();
+   }catch(e){
+     alert(e.message);
+   }finally{
+     $('modalSave').disabled=false;
+   }
+ });
 }
 
 init();

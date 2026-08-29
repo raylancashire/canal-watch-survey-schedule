@@ -55,3 +55,68 @@ Row Level Security controls database access:
 When an authorised manager opens the admin page, overdue auto-repeat survey
 rounds are rolled forward and the selected survey sites are copied into the
 new round. This can later be moved to a scheduled server job if desired.
+
+
+# Administrator Management Upgrade
+
+This package now includes an **Administrators** section for Admin Managers.
+
+## What an Admin Manager can do
+- view administrator accounts
+- invite a new administrator by email
+- grant normal schedule-management access
+- optionally grant Admin Manager access
+- disable/re-enable another administrator's access
+- see their own account but cannot accidentally remove their own Admin Manager rights
+
+## Security design
+Administrator invitation and permission changes are NOT performed directly by browser code.
+
+They go through the Supabase Edge Function:
+
+`supabase/functions/manage-admins/index.ts`
+
+That function:
+1. verifies the signed-in user
+2. confirms that `can_manage_admins = true`
+3. uses Supabase's server-side Auth Admin API
+4. sends the invitation or changes the permissions
+
+The Supabase service-role/secret key remains server-side only.
+
+## Installation
+
+### 1. Run the migration
+In Supabase SQL Editor, run:
+
+`administrator-management-upgrade.sql`
+
+Your existing schedule manager is promoted to Admin Manager automatically.
+
+### 2. Deploy the Edge Function
+In Supabase Dashboard, create/deploy an Edge Function named:
+
+`manage-admins`
+
+Use the supplied:
+
+`supabase/functions/manage-admins/index.ts`
+
+The hosted Supabase Edge Function environment provides `SUPABASE_URL` and the legacy `SUPABASE_SERVICE_ROLE_KEY` automatically.
+
+### 3. Upload updated website files
+Replace these files in GitHub Pages:
+- `admin.html`
+- `admin.js`
+
+The public schedule files do not need to change for this feature.
+
+### 4. Configure invitation redirect
+In Supabase Authentication URL Configuration, add:
+
+`https://raylancashire.github.io/canal-watch-survey-schedule/admin.html`
+
+to the allowed redirect URLs.
+
+## Invitation note
+Supabase invitation links use the project's Auth email template and expiration settings.
