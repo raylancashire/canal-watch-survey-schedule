@@ -1,73 +1,38 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Canal Watch Schedule Administration</title>
-<link rel="stylesheet" href="styles.css">
-</head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Canal Watch Schedule Administration</title><link rel="stylesheet" href="styles.css"></head>
 <body>
-<header class="site-header admin-header">
-  <div class="wrap">
-    <p class="eyebrow">Queen's Park Trust • Canal Watch</p>
-    <h1>Schedule Administration</h1>
-    <p class="lede">Assign survey work by clicking individual volunteers, project teams, or both.</p>
-  </div>
-</header>
-
+<header class="site-header admin-header"><div class="wrap"><p class="eyebrow">Queen's Park Trust • Canal Watch</p><h1>Schedule Administration</h1><p class="lede">Secure online administration for volunteers, teams, survey sites, rounds and assignments.</p></div></header>
 <main class="wrap">
-  <div class="notice"><strong>Prototype mode:</strong> changes are stored only in this browser. Live security will be provided by Supabase authentication and database permissions.</div>
+<section id="loginView" class="login-card">
+<h2>Administrator sign in</h2><p class="muted">Use the Supabase Authentication account authorised to manage the schedule.</p>
+<form id="loginForm"><label class="field">Email<input id="loginEmail" type="email" autocomplete="username" required></label>
+<label class="field" style="margin-top:12px">Password<input id="loginPassword" type="password" autocomplete="current-password" required></label>
+<div class="login-actions"><button class="primary" type="submit">Sign in</button></div><div id="loginMessage"></div></form>
+</section>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="rounds">Survey rounds</button>
-    <button class="tab" data-tab="sites">Survey sites</button>
-    <button class="tab" data-tab="teams">Project teams</button>
-    <button class="tab" data-tab="users">Volunteers</button>
-    <button class="tab" data-tab="assignments">Site assignments</button>
-  </nav>
-
-  <section id="rounds" class="admin-section panel active">
-    <div class="panel-heading"><div><h2>Survey rounds</h2><p>Choose the survey site(s), date, recurrence pattern, and whether the next round should be created automatically.</p></div><button class="primary" id="addRoundBtn">+ Add round</button></div>
-    <div id="roundList"></div>
-  </section>
-
-  <section id="sites" class="admin-section panel">
-    <div class="panel-heading"><div><h2>Survey sites</h2><p>Add sampling locations with an optional address, GPS coordinates, or three-word location. Scheduling and recurrence are set within Survey Rounds.</p></div><button class="primary" id="addSiteBtn">+ Add site</button></div>
-    <div id="siteList"></div>
-  </section>
-
-  <section id="teams" class="admin-section panel">
-    <div class="panel-heading"><div><h2>Project teams</h2><p>Create teams and choose their members.</p></div><button class="primary" id="addTeamBtn">+ Add team</button></div>
-    <div id="teamList"></div>
-  </section>
-
-  <section id="users" class="admin-section panel">
-    <div class="panel-heading"><div><h2>Volunteers</h2><p>All users are volunteers. Email addresses are optional and remain private.</p></div><button class="primary" id="addUserBtn">+ Add volunteer</button></div>
-    <div id="userList"></div>
-  </section>
-
-  <section id="assignments" class="admin-section panel">
-    <div class="panel-heading"><div><h2>Site assignments</h2><p>Assign individual volunteers, project teams, or both by clicking their names.</p></div><button class="primary" id="addAssignmentBtn">+ Add site assignment</button></div>
-    <div id="assignmentList"></div>
-  </section>
-
-  <p class="admin-link"><a href="index.html">← Public survey schedule</a></p>
+<section id="adminView" class="hidden">
+<div class="toolbar notice"><span>Signed in as <strong id="signedInAs"></strong></span><button class="secondary" id="signOutBtn">Sign out</button></div>
+<nav class="tabs">
+<button class="tab active" data-tab="rounds">Survey rounds</button>
+<button class="tab" data-tab="sites">Survey sites</button>
+<button class="tab" data-tab="teams">Project teams</button>
+<button class="tab" data-tab="volunteers">Volunteers</button>
+<button class="tab" data-tab="assignments">Site assignments</button>
+</nav>
+<section id="rounds" class="admin-section panel active"><div class="panel-heading"><div><h2>Survey rounds</h2><p>Select sites, date, recurrence and automatic repeat.</p></div><button class="primary" id="addRoundBtn">+ Add round</button></div><div id="roundList"></div></section>
+<section id="sites" class="admin-section panel"><div class="panel-heading"><div><h2>Survey sites</h2><p>Store an optional address, GPS location and three-word location.</p></div><button class="primary" id="addSiteBtn">+ Add site</button></div><div id="siteList"></div></section>
+<section id="teams" class="admin-section panel"><div class="panel-heading"><div><h2>Project teams</h2><p>Select team members and coordinator in one interface.</p></div><button class="primary" id="addTeamBtn">+ Add team</button></div><div id="teamList"></div></section>
+<section id="volunteers" class="admin-section panel"><div class="panel-heading"><div><h2>Volunteers</h2><p>Email addresses are optional and private.</p></div><button class="primary" id="addVolunteerBtn">+ Add volunteer</button></div><div id="volunteerList"></div></section>
+<section id="assignments" class="admin-section panel"><div class="panel-heading"><div><h2>Site assignments</h2><p>Assign individuals, project teams, or both by clicking names.</p></div><button class="primary" id="addAssignmentBtn">+ Add assignment</button></div><div id="assignmentList"></div></section>
+<p class="admin-link"><a href="index.html">← Public survey schedule</a></p>
+</section>
 </main>
 
-<div class="modal-backdrop hidden" id="modalBackdrop">
-  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-    <div class="modal-head">
-      <h2 id="modalTitle">Assignment</h2>
-      <button class="icon-btn" id="modalClose" aria-label="Close">×</button>
-    </div>
-    <div id="modalBody"></div>
-    <div class="modal-actions">
-      <button class="secondary" id="modalCancel">Cancel</button>
-      <button class="primary" id="modalSave">Save</button>
-    </div>
-  </section>
-</div>
+<div class="modal-backdrop hidden" id="modalBackdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+<div class="modal-head"><h2 id="modalTitle">Edit</h2><button class="icon-btn" id="modalClose" aria-label="Close">×</button></div>
+<div id="modalBody"></div><div class="modal-actions"><button class="secondary" id="modalCancel">Cancel</button><button class="primary" id="modalSave">Save</button></div>
+</section></div>
 
-<script src="app.js"></script>
-</body>
-</html>
+<script type="module" src="admin.js"></script>
+</body></html>
