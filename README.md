@@ -120,3 +120,12 @@ to the allowed redirect URLs.
 
 ## Invitation note
 Supabase invitation links use the project's Auth email template and expiration settings.
+
+
+## Webador public-page cleanup
+The public `index.html` no longer shows the Schedule administration link.
+Administration remains available directly at:
+
+`https://raylancashire.github.io/canal-watch-survey-schedule/admin.html`
+
+A recommended Webador iframe snippet is included in `WEBADOR-EMBED.html`.

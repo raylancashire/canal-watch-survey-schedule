@@ -16,8 +16,43 @@
 <div id="publicMessage"></div>
 <div class="table-wrap"><table><thead><tr><th>Sampling site</th><th>Survey date</th><th>Assigned to</th><th>Status</th></tr></thead><tbody id="scheduleBody"><tr><td colspan="4">Loading schedule…</td></tr></tbody></table></div>
 </section>
-<p class="admin-link"><a href="admin.html">Schedule administration</a></p>
+
 </main>
 <footer><div class="wrap">Canal Watch • Queen's Park Trust</div></footer>
 <script type="module" src="app.js"></script>
+
+<script>
+(function () {
+  function reportHeight() {
+    const height = Math.max(
+      document.documentElement.scrollHeight,
+      document.body ? document.body.scrollHeight : 0
+    );
+    window.parent.postMessage(
+      { type: 'canal-watch-survey-height', height: height },
+      '*'
+    );
+  }
+
+  window.addEventListener('load', reportHeight);
+  window.addEventListener('resize', reportHeight);
+
+  if ('ResizeObserver' in window) {
+    const observer = new ResizeObserver(reportHeight);
+    observer.observe(document.documentElement);
+    if (document.body) observer.observe(document.body);
+  } else if ('MutationObserver' in window) {
+    const observer = new MutationObserver(reportHeight);
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true
+    });
+  }
+
+  setTimeout(reportHeight, 250);
+  setTimeout(reportHeight, 1000);
+})();
+</script>
+
 </body></html>
