@@ -73,7 +73,17 @@ const recurrenceLabel=r=>({none:'One-off',weekly:'Weekly',fortnightly:'Fortnight
 function render(){
  $('volunteerList').innerHTML=db.volunteers.map(v=>record(v.name,v.email?`Email: ${esc(v.email)}`:'No email address',v.active?'Active':'Inactive',`volunteer:${v.id}`)).join('');
  $('siteList').innerHTML=db.sites.map(s=>{const bits=[s.address,s.latitude!=null&&s.longitude!=null?`${s.latitude}, ${s.longitude}`:null,s.three_word_location?`///${s.three_word_location.replace(/^\/+/, '')}`:null].filter(Boolean);return record(s.name,bits.join(' • ')||'No location details',s.active?'Active':'Inactive',`site:${s.id}`)}).join('');
- $('roundList').innerHTML=db.rounds.map(r=>{const count=db.roundSites.filter(x=>x.survey_round_id===r.id).length;return record(r.name,`${fmtDate(r.survey_date)} • ${recurrenceLabel(r)}${r.auto_repeat?' • Auto-repeat':''} • ${count} site${count===1?'':'s'}`,r.status,`round:${r.id}`)}).join('');
+ $('roundList').innerHTML=db.rounds.map(r=>{
+  const count=db.roundSites.filter(x=>x.survey_round_id===r.id).length;
+  const statusLabel=r.status==='conducted'?'Conducted':r.status==='cancelled'?'Cancelled':'Planned';
+  const actual=r.status==='conducted'&&r.conducted_date?` • Conducted ${fmtDate(r.conducted_date)}`:'';
+  return record(
+    r.name,
+    `${fmtDate(r.survey_date)}${actual} • ${recurrenceLabel(r)}${r.auto_repeat?' • Auto-repeat':''} • ${count} site${count===1?'':'s'}`,
+    statusLabel,
+    `round:${r.id}`
+  )
+}).join('');
  $('teamList').innerHTML=db.teams.map(t=>{const mem=db.members.filter(m=>m.team_id===t.id).map(m=>volunteerName(m.volunteer_id));return `<div class="record"><div><strong>${esc(t.name)}</strong><br><small>Coordinator: ${esc(volunteerName(t.coordinator_id))}</small><div class="assignment-summary">${mem.map(n=>`<span class="pill">${esc(n)}</span>`).join('')}</div></div><div>${mem.length} member${mem.length===1?'':'s'}</div><div>${t.active?'Active':'Inactive'}</div><div class="record-actions"><button class="secondary edit-team" data-id="${t.id}">Edit</button></div></div>`}).join('');
  $('assignmentList').innerHTML=db.assignments.map(a=>{const names=[...db.assignmentTeams.filter(x=>x.assignment_id===a.id).map(x=>teamName(x.team_id)),...db.assignmentVolunteers.filter(x=>x.assignment_id===a.id).map(x=>volunteerName(x.volunteer_id))];return `<div class="record"><div><strong>${esc(roundName(a.survey_round_id))} — ${esc(siteName(a.survey_site_id))}</strong><div class="assignment-summary">${names.length?names.map(n=>`<span class="pill">${esc(n)}</span>`).join(''):'No assignment'}</div></div><div>${a.status}</div><div></div><div class="record-actions"><button class="secondary edit-assignment" data-id="${a.id}">Edit</button><button class="danger delete-assignment" data-id="${a.id}">Delete</button></div></div>`}).join('');
  if($('adminList')){
@@ -139,17 +149,186 @@ function openTeam(id){
 }
 
 function openRound(id){
- const r=id?db.rounds.find(x=>x.id===id):{name:'',survey_date:isoToday(),status:'planned',recurrence:'none',recurrence_interval:1,auto_repeat:false};
+ const r=id?db.rounds.find(x=>x.id===id):{
+   name:'',
+   survey_date:isoToday(),
+   status:'planned',
+   conducted_date:null,
+   recurrence:'none',
+   recurrence_interval:1,
+   auto_repeat:false
+ };
  const selected=id?db.roundSites.filter(x=>x.survey_round_id===id).map(x=>x.survey_site_id):[];
  const sites=db.sites.filter(s=>s.active);
- openModal(id?'Edit survey round':'Add survey round',`<div class="form-grid"><label class="field">Round name<input id="rName" value="${esc(r.name)}"></label><label class="field">Survey date<input id="rDate" type="date" value="${r.survey_date}"></label></div><div class="picker-section"><h3>Survey sites</h3><p>Click one or more sites.</p><div class="choice-grid">${sites.map(s=>`<button type="button" class="choice ${selected.includes(s.id)?'selected':''}" data-rsite="${s.id}">${esc(s.name)}<small>Sampling site</small></button>`).join('')}</div></div><div class="recurrence-box"><label class="field">Recurrence<select id="rRec"><option value="none" ${r.recurrence==='none'?'selected':''}>One-off</option><option value="weekly" ${r.recurrence==='weekly'?'selected':''}>Weekly</option><option value="fortnightly" ${r.recurrence==='fortnightly'?'selected':''}>Fortnightly</option><option value="monthly" ${r.recurrence==='monthly'?'selected':''}>Monthly</option><option value="custom_days" ${r.recurrence==='custom_days'?'selected':''}>Every N days</option></select></label><label class="field">Repeat interval<input id="rInterval" type="number" min="1" value="${r.recurrence_interval||1}"></label><label class="inline-check"><input id="rAuto" type="checkbox" ${r.auto_repeat?'checked':''}> Automatically create the next survey round after this date has passed</label></div>`,async()=>{
-  const name=$('rName').value.trim(),survey_date=$('rDate').value,siteIds=[...document.querySelectorAll('[data-rsite].selected')].map(b=>Number(b.dataset.rsite));if(!name||!survey_date)return alert('Enter a name and date.');if(!siteIds.length)return alert('Select at least one survey site.');const recurrence=$('rRec').value,row={name,survey_date,status:'planned',recurrence,recurrence_interval:Math.max(1,Number($('rInterval').value)||1),auto_repeat:$('rAuto').checked&&recurrence!=='none'};
-  let roundId=id;if(id){const {error}=await supabase.from('survey_rounds').update(row).eq('id',id);if(error)return alert(error.message)}else{const {data,error}=await supabase.from('survey_rounds').insert(row).select('id').single();if(error)return alert(error.message);roundId=data.id}
-  await supabase.from('survey_round_sites').delete().eq('survey_round_id',roundId);let q=await supabase.from('survey_round_sites').insert(siteIds.map(survey_site_id=>({survey_round_id:roundId,survey_site_id})));if(q.error)return alert(q.error.message);
-  for(const survey_site_id of siteIds){if(!db.assignments.some(a=>a.survey_round_id===roundId&&a.survey_site_id===survey_site_id)){await supabase.from('site_assignments').insert({survey_round_id:roundId,survey_site_id,status:'needed'})}}
-  closeModal();await loadAll();
- });
+
+ openModal(
+   id?'Edit survey round':'Add survey round',
+   `<div class="form-grid">
+      <label class="field">
+        Round name
+        <input id="rName" value="${esc(r.name)}">
+      </label>
+
+      <label class="field">
+        Planned survey date
+        <input id="rDate" type="date" value="${r.survey_date}">
+      </label>
+
+      <label class="field">
+        Survey status
+        <select id="rStatus">
+          <option value="planned" ${r.status==='planned'?'selected':''}>Planned</option>
+          <option value="conducted" ${r.status==='conducted'?'selected':''}>Conducted</option>
+          <option value="cancelled" ${r.status==='cancelled'?'selected':''}>Cancelled</option>
+        </select>
+      </label>
+
+      <label class="field" id="conductedDateField" style="${r.status==='conducted'?'':'display:none'}">
+        Actual survey date
+        <input
+          id="rConductedDate"
+          type="date"
+          value="${r.conducted_date||r.survey_date||''}">
+      </label>
+    </div>
+
+    <p class="muted" style="margin-top:10px">
+      Planned date records when the survey was scheduled. Actual survey date records when sampling was really carried out.
+    </p>
+
+    <div class="picker-section">
+      <h3>Survey sites</h3>
+      <p>Click one or more sites.</p>
+      <div class="choice-grid">
+        ${sites.map(s=>`
+          <button
+            type="button"
+            class="choice ${selected.includes(s.id)?'selected':''}"
+            data-rsite="${s.id}">
+            ${esc(s.name)}
+            <small>Sampling site</small>
+          </button>`).join('')}
+      </div>
+    </div>
+
+    <div class="recurrence-box">
+      <label class="field">
+        Recurrence
+        <select id="rRec">
+          <option value="none" ${r.recurrence==='none'?'selected':''}>One-off</option>
+          <option value="weekly" ${r.recurrence==='weekly'?'selected':''}>Weekly</option>
+          <option value="fortnightly" ${r.recurrence==='fortnightly'?'selected':''}>Fortnightly</option>
+          <option value="monthly" ${r.recurrence==='monthly'?'selected':''}>Monthly</option>
+          <option value="custom_days" ${r.recurrence==='custom_days'?'selected':''}>Every N days</option>
+        </select>
+      </label>
+
+      <label class="field">
+        Repeat interval
+        <input id="rInterval" type="number" min="1" value="${r.recurrence_interval||1}">
+      </label>
+
+      <label class="inline-check">
+        <input id="rAuto" type="checkbox" ${r.auto_repeat?'checked':''}>
+        Automatically create the next survey round after this date has passed
+      </label>
+    </div>`,
+   async()=>{
+     const name=$('rName').value.trim();
+     const survey_date=$('rDate').value;
+     const status=$('rStatus').value;
+     const conducted_date=status==='conducted' ? $('rConductedDate').value : null;
+     const siteIds=[...document.querySelectorAll('[data-rsite].selected')]
+       .map(b=>Number(b.dataset.rsite));
+
+     if(!name||!survey_date)return alert('Enter a name and planned survey date.');
+     if(!siteIds.length)return alert('Select at least one survey site.');
+     if(status==='conducted'&&!conducted_date)return alert('Enter the actual survey date.');
+
+     const recurrence=$('rRec').value;
+
+     const row={
+       name,
+       survey_date,
+       status,
+       conducted_date,
+       recurrence,
+       recurrence_interval:Math.max(1,Number($('rInterval').value)||1),
+       auto_repeat:$('rAuto').checked&&recurrence!=='none'&&status!=='cancelled'
+     };
+
+     let roundId=id;
+
+     if(id){
+       const {error}=await supabase
+         .from('survey_rounds')
+         .update(row)
+         .eq('id',id);
+
+       if(error)return alert(error.message);
+     }else{
+       const {data,error}=await supabase
+         .from('survey_rounds')
+         .insert(row)
+         .select('id')
+         .single();
+
+       if(error)return alert(error.message);
+       roundId=data.id;
+     }
+
+     await supabase
+       .from('survey_round_sites')
+       .delete()
+       .eq('survey_round_id',roundId);
+
+     let q=await supabase
+       .from('survey_round_sites')
+       .insert(siteIds.map(survey_site_id=>({
+         survey_round_id:roundId,
+         survey_site_id
+       })));
+
+     if(q.error)return alert(q.error.message);
+
+     for(const survey_site_id of siteIds){
+       if(!db.assignments.some(a=>
+         a.survey_round_id===roundId &&
+         a.survey_site_id===survey_site_id
+       )){
+         await supabase
+           .from('site_assignments')
+           .insert({
+             survey_round_id:roundId,
+             survey_site_id,
+             status:'needed'
+           });
+       }
+     }
+
+     closeModal();
+     await loadAll();
+   }
+ );
+
  bindChoices('data-rsite');
+
+ const statusSelect=$('rStatus');
+ const conductedField=$('conductedDateField');
+ const conductedInput=$('rConductedDate');
+
+ statusSelect.onchange=()=>{
+   const conducted=statusSelect.value==='conducted';
+   conductedField.style.display=conducted?'':'none';
+
+   if(conducted&&!conductedInput.value){
+     conductedInput.value=$('rDate').value||isoToday();
+   }
+
+   if(statusSelect.value==='cancelled'){
+     $('rAuto').checked=false;
+   }
+ };
 }
 
 function openAssignment(id){
