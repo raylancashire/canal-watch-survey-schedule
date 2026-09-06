@@ -127,23 +127,42 @@ function mapButton(site) {
   const lon = Number(site?.longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '';
 
+  return `
+    <button
+      type="button"
+      class="site-map-toggle"
+      data-site-map-toggle="${site.id}"
+      aria-expanded="false"
+      aria-controls="siteMapPanel-${site.id}">
+      View map ＋
+    </button>`;
+}
+
+function mapPanel(site) {
+  const lat = Number(site?.latitude);
+  const lon = Number(site?.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '';
+
   const words = site.three_word_location
-    ? `///${escapeHtml(String(site.three_word_location).replace(/^\/+/, ''))}`
+    ? `///${escapeHtml(String(site.three_word_location).replace(/^\\/+/, ''))}`
     : '';
 
   return `
-    <div class="site-map-disclosure">
-      <button type="button" class="site-map-toggle" data-site-map-toggle="${site.id}" aria-expanded="false">
-        View map ＋
-      </button>
-      <div class="site-map-panel hidden" data-site-map-panel="${site.id}">
-        ${(site.address || words) ? `<div class="site-map-meta">${site.address ? escapeHtml(site.address) : ''}${site.address && words ? ' • ' : ''}${words}</div>` : ''}
-        <div id="volunteerSiteMap-${site.id}" class="site-map-canvas"></div>
-        <a class="site-map-open-link" target="_blank" rel="noopener"
-          href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}">
-          Open larger map
-        </a>
-      </div>
+    <div
+      id="siteMapPanel-${site.id}"
+      class="site-map-panel full-width-map hidden"
+      data-site-map-panel="${site.id}">
+      ${(site.address || words)
+        ? `<div class="site-map-meta">${site.address ? escapeHtml(site.address) : ''}${site.address && words ? ' • ' : ''}${words}</div>`
+        : ''}
+      <div id="volunteerSiteMap-${site.id}" class="site-map-canvas"></div>
+      <a
+        class="site-map-open-link"
+        target="_blank"
+        rel="noopener"
+        href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}">
+        Open larger map
+      </a>
     </div>`;
 }
 
@@ -251,6 +270,8 @@ function renderSchedule() {
             ? `<button class="volunteer-button danger" type="button" data-unassign="${assignment.id}">Remove me</button>`
             : `<button class="volunteer-button" type="button" data-assign-round="${round.id}" data-assign-site="${siteId}">Assign me</button>`}
         </div>
+
+        ${mapPanel(site)}
       </article>`;
   }).join('');
 
