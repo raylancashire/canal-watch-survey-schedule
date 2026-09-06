@@ -10,6 +10,183 @@ const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 
 let db={rounds:[],sites:[],teams:[],volunteers:[],roundSites:[],assignments:[],assignmentTeams:[],assignmentVolunteers:[]};
 
+let leafletPromise=null;
+let openSiteMapId=null;
+const siteMaps=new Map();
+
+function loadLeaflet(){
+ if(window.L)return Promise.resolve(window.L);
+ if(leafletPromise)return leafletPromise;
+
+ leafletPromise=new Promise((resolve,reject)=>{
+   if(!document.querySelector('link[data-canal-leaflet]')){
+     const link=document.createElement('link');
+     link.rel='stylesheet';
+     link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+     link.dataset.canalLeaflet='1';
+     document.head.appendChild(link);
+   }
+
+   const existing=document.querySelector('script[data-canal-leaflet]');
+   if(existing){
+     existing.addEventListener('load',()=>resolve(window.L),{once:true});
+     existing.addEventListener('error',reject,{once:true});
+     return;
+   }
+
+   const script=document.createElement('script');
+   script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+   script.dataset.canalLeaflet='1';
+   script.onload=()=>resolve(window.L);
+   script.onerror=reject;
+   document.head.appendChild(script);
+ });
+
+ return leafletPromise;
+}
+
+function siteFor(id){
+ return db.sites.find(s=>s.id===id);
+}
+
+function hasCoordinates(site){
+ return site &&
+   Number.isFinite(Number(site.latitude)) &&
+   Number.isFinite(Number(site.longitude));
+}
+
+function mapDisclosureHtml(siteId){
+ const site=siteFor(siteId);
+ if(!hasCoordinates(site))return '';
+
+ const words=site.three_word_location
+   ? ` • ///${escapeHtml(String(site.three_word_location).replace(/^\/+/,''))}`
+   : '';
+
+ const address=site.address
+   ? `<div class="site-map-meta">${escapeHtml(site.address)}${words}</div>`
+   : (words ? `<div class="site-map-meta">${words.replace(/^ • /,'')}</div>` : '');
+
+ return `
+   <div class="site-map-disclosure">
+     <button
+       type="button"
+       class="site-map-toggle"
+       data-site-map-toggle="${siteId}"
+       aria-expanded="false"
+       aria-controls="siteMapPanel-${siteId}">
+       <span>View map</span>
+       <span class="site-map-toggle-icon" aria-hidden="true">＋</span>
+     </button>
+
+     <div
+       id="siteMapPanel-${siteId}"
+       class="site-map-panel hidden"
+       data-site-map-panel="${siteId}">
+       ${address}
+       <div
+         id="siteMap-${siteId}"
+         class="site-map-canvas"
+         role="img"
+         aria-label="Map showing ${escapeHtml(site.name)}">
+       </div>
+       <a
+         class="site-map-open-link"
+         href="https://www.openstreetmap.org/?mlat=${Number(site.latitude)}&mlon=${Number(site.longitude)}#map=18/${Number(site.latitude)}/${Number(site.longitude)}"
+         target="_blank"
+         rel="noopener">
+         Open larger map
+       </a>
+     </div>
+   </div>`;
+}
+
+function closeSiteMap(siteId){
+ const panel=document.querySelector(`[data-site-map-panel="${siteId}"]`);
+ const button=document.querySelector(`[data-site-map-toggle="${siteId}"]`);
+ if(panel)panel.classList.add('hidden');
+ if(button){
+   button.setAttribute('aria-expanded','false');
+   const icon=button.querySelector('.site-map-toggle-icon');
+   if(icon)icon.textContent='＋';
+ }
+ if(openSiteMapId===siteId)openSiteMapId=null;
+}
+
+async function openSiteMap(siteId){
+ const site=siteFor(siteId);
+ if(!hasCoordinates(site))return;
+
+ if(openSiteMapId && openSiteMapId!==siteId){
+   closeSiteMap(openSiteMapId);
+ }
+
+ const panel=document.querySelector(`[data-site-map-panel="${siteId}"]`);
+ const button=document.querySelector(`[data-site-map-toggle="${siteId}"]`);
+ if(!panel||!button)return;
+
+ panel.classList.remove('hidden');
+ button.setAttribute('aria-expanded','true');
+ const icon=button.querySelector('.site-map-toggle-icon');
+ if(icon)icon.textContent='−';
+ openSiteMapId=siteId;
+
+ try{
+   const L=await loadLeaflet();
+   const lat=Number(site.latitude);
+   const lon=Number(site.longitude);
+
+   if(!siteMaps.has(siteId)){
+     const map=L.map(`siteMap-${siteId}`,{
+       scrollWheelZoom:false,
+       attributionControl:true
+     }).setView([lat,lon],17);
+
+     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+       maxZoom:19,
+       attribution:'&copy; OpenStreetMap contributors'
+     }).addTo(map);
+
+     const popupParts=[`<strong>${escapeHtml(site.name)}</strong>`];
+     if(site.address)popupParts.push(`<br>${escapeHtml(site.address)}`);
+     if(site.three_word_location){
+       popupParts.push(`<br>///${escapeHtml(String(site.three_word_location).replace(/^\/+/,''))}`);
+     }
+
+     L.marker([lat,lon])
+       .addTo(map)
+       .bindPopup(popupParts.join(''))
+       .openPopup();
+
+     siteMaps.set(siteId,map);
+   }
+
+   setTimeout(()=>siteMaps.get(siteId)?.invalidateSize(),80);
+ }catch(error){
+   const canvas=document.getElementById(`siteMap-${siteId}`);
+   if(canvas){
+     canvas.innerHTML='<div class="site-map-error">Map could not be loaded. Use “Open larger map” instead.</div>';
+   }
+ }
+}
+
+function setupSiteMapDisclosures(){
+ document.addEventListener('click',event=>{
+   const button=event.target.closest('[data-site-map-toggle]');
+   if(!button)return;
+
+   const siteId=Number(button.dataset.siteMapToggle);
+   const isOpen=button.getAttribute('aria-expanded')==='true';
+
+   if(isOpen){
+     closeSiteMap(siteId);
+   }else{
+     openSiteMap(siteId);
+   }
+ });
+}
+
+
 async function load(){
  const queries=await Promise.all([
   supabase.from('survey_rounds').select('*').neq('status','inactive').gte('survey_date',today()).order('survey_date'),
@@ -93,7 +270,11 @@ function row(r,a){
    : '—';
 
  return `<tr>
-   <td><strong>${escapeHtml(siteName(a.survey_site_id))}</strong><br><small>${escapeHtml(r.name)}</small></td>
+   <td>
+     <strong>${escapeHtml(siteName(a.survey_site_id))}</strong><br>
+     <small>${escapeHtml(r.name)}</small>
+     ${mapDisclosureHtml(a.survey_site_id)}
+   </td>
    <td>${fmtDate(r.survey_date)}</td>
    <td class="assignment-column">${assigned}</td>
    <td><span class="status ${cls}">${label}</span></td>
@@ -111,12 +292,14 @@ function stats(rounds){
 }
 
 function renderAll(){
+ openSiteMapId=null;
  const rows=db.rounds.flatMap(r=>roundAssignments(r).map(a=>row(r,a)));
  $('scheduleBody').innerHTML=rows.join('')||'<tr><td colspan="5">No upcoming surveys scheduled.</td></tr>';
  stats(db.rounds);
 }
 
 function renderOne(id){
+ openSiteMapId=null;
  const r=db.rounds.find(x=>x.id===id);
  if(!r)return;
  const rows=roundAssignments(r).map(a=>row(r,a));
@@ -181,4 +364,5 @@ function setupContactModal(){
 
 setupCompactView();
 setupContactModal();
+setupSiteMapDisclosures();
 load();
