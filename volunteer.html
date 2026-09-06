@@ -173,6 +173,104 @@
         width: 100%;
       }
     }
+
+    .volunteer-tabs {
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin:18px 0 14px;
+    }
+
+    .volunteer-tab {
+      border:1px solid #cfdcd2;
+      border-radius:999px;
+      background:#f7faf8;
+      color:#234231;
+      padding:8px 13px;
+      font:inherit;
+      font-size:.9rem;
+      font-weight:700;
+      cursor:pointer;
+    }
+
+    .volunteer-tab.active {
+      background:#173d2b;
+      border-color:#173d2b;
+      color:#fff;
+    }
+
+    .volunteer-tab-count {
+      display:inline-block;
+      margin-left:5px;
+      opacity:.85;
+      font-size:.8rem;
+    }
+
+    .survey-date-badge {
+      display:inline-block;
+      margin-top:7px;
+      border-radius:999px;
+      padding:4px 9px;
+      background:#edf2ef;
+      color:#355343;
+      font-size:.8rem;
+      font-weight:700;
+    }
+
+    .site-map-disclosure {
+      margin-top:10px;
+    }
+
+    .site-map-toggle {
+      border:1px solid #cbd9cf;
+      border-radius:8px;
+      background:#f4f8f5;
+      color:#214c34;
+      padding:7px 10px;
+      font:inherit;
+      font-size:.82rem;
+      font-weight:700;
+      cursor:pointer;
+    }
+
+    .site-map-panel {
+      margin-top:8px;
+      padding:9px;
+      border:1px solid #d7e2da;
+      border-radius:10px;
+      background:#fbfdfb;
+    }
+
+    .site-map-canvas {
+      width:100%;
+      height:260px;
+      border-radius:8px;
+      overflow:hidden;
+      background:#edf2ef;
+    }
+
+    .site-map-open-link {
+      display:inline-block;
+      margin-top:7px;
+      color:#145f3b;
+      font-size:.82rem;
+      font-weight:700;
+      text-decoration:none;
+    }
+
+    .site-map-meta {
+      margin:0 0 7px;
+      color:#617068;
+      font-size:.82rem;
+    }
+
+    .survey-empty {
+      padding:18px;
+      border:1px dashed #cfdcd2;
+      border-radius:10px;
+      color:#68776e;
+      background:#fafcfb;
+    }
   </style>
 </head>
 
@@ -210,7 +308,7 @@
 
       <div class="portal-toolbar">
         <div>
-          <h2 style="margin:0 0 4px;">Upcoming surveys</h2>
+          <h2 style="margin:0 0 4px;">Survey activities</h2>
           <p id="signedInAs"></p>
         </div>
 
@@ -221,9 +319,17 @@
 
       <div id="portalMessage"></div>
 
-      <p>
-        Select <strong>Assign me</strong> beside a site you can cover.
-        You can also remove your own assignment later.
+      <div class="volunteer-tabs" role="tablist" aria-label="Volunteer surveys">
+        <button class="volunteer-tab active" type="button" data-volunteer-tab="available" aria-selected="true">
+          Available Surveys <span id="availableCount" class="volunteer-tab-count">0</span>
+        </button>
+        <button class="volunteer-tab" type="button" data-volunteer-tab="mine" aria-selected="false">
+          My Surveys <span id="myCount" class="volunteer-tab-count">0</span>
+        </button>
+      </div>
+
+      <p id="tabHelp">
+        Choose <strong>Assign me</strong> beside a survey site you can cover.
       </p>
 
       <div class="survey-list" id="surveyList">
