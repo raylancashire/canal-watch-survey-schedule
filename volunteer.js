@@ -4,6 +4,11 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
 
+const portalParams = new URLSearchParams(window.location.search);
+const requestedRoundId = Number(portalParams.get('round')) || null;
+const requestedSiteId = Number(portalParams.get('site')) || null;
+let requestedSurveyHandled = false;
+
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[c]));
@@ -30,10 +35,21 @@ function setMessage(target, text, error = false) {
 }
 
 async function sendMagicLink(email) {
-  const redirectTo = 'https://raylancashire.github.io/canal-watch-survey-schedule/volunteer.html';
+  const redirectUrl = new URL(
+    'https://raylancashire.github.io/canal-watch-survey-schedule/volunteer.html'
+  );
+
+  if (requestedRoundId && requestedSiteId) {
+    redirectUrl.searchParams.set('round', String(requestedRoundId));
+    redirectUrl.searchParams.set('site', String(requestedSiteId));
+  }
+
   return supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: redirectTo, shouldCreateUser: true }
+    options: {
+      emailRedirectTo: redirectUrl.toString(),
+      shouldCreateUser: true
+    }
   });
 }
 
@@ -131,8 +147,57 @@ function mapButton(site) {
     </div>`;
 }
 
+function isRequestedSurvey(roundId, siteId) {
+  return Boolean(
+    requestedRoundId &&
+    requestedSiteId &&
+    Number(roundId) === requestedRoundId &&
+    Number(siteId) === requestedSiteId
+  );
+}
+
+function focusRequestedSurvey(allEntries) {
+  if (!requestedRoundId || !requestedSiteId) return;
+
+  const requested = allEntries.find(
+    (entry) => isRequestedSurvey(entry.round.id, entry.siteId)
+  );
+
+  if (!requested) {
+    setMessage(
+      $('portalMessage'),
+      'The survey site you selected from the public schedule is no longer available as an upcoming planned survey.',
+      true
+    );
+    return;
+  }
+
+  activeTab = requested.mine ? 'mine' : 'available';
+}
+
+function scrollToRequestedSurvey() {
+  if (requestedSurveyHandled || !requestedRoundId || !requestedSiteId) return;
+
+  const target = document.querySelector(
+    `[data-requested-survey="${requestedRoundId}:${requestedSiteId}"]`
+  );
+
+  if (!target) return;
+
+  requestedSurveyHandled = true;
+
+  requestAnimationFrame(() => {
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+}
+
 function renderSchedule() {
   const all = entries();
+
+  if (!requestedSurveyHandled) {
+    focusRequestedSurvey(all);
+  }
+
   const mine = all.filter((x) => x.mine);
   const available = all.filter((x) => !x.mine);
 
@@ -145,9 +210,15 @@ function renderSchedule() {
     button.setAttribute('aria-selected', String(on));
   });
 
-  $('tabHelp').innerHTML = activeTab === 'mine'
-    ? 'These are the surveys you are currently covering. Use <strong>Remove me</strong> if you can no longer attend.'
-    : 'Choose <strong>Assign me</strong> beside a survey site you can cover.';
+  const requestedHelp = requestedRoundId && requestedSiteId
+    ? '<div class="requested-intro"><strong>Selected from Survey Schedule:</strong> the survey you chose is highlighted below.</div>'
+    : '';
+
+  $('tabHelp').innerHTML = requestedHelp + (
+    activeTab === 'mine'
+      ? 'These are the surveys you are currently covering. Use <strong>Remove me</strong> if you can no longer attend.'
+      : 'Choose <strong>Assign me</strong> beside a survey site you can cover.'
+  );
 
   const shown = activeTab === 'mine' ? mine : available;
 
@@ -163,12 +234,15 @@ function renderSchedule() {
   $('surveyList').innerHTML = shown.map(({ round, siteId, assignment, mine }) => {
     const site = siteFor(siteId) || {};
     return `
-      <article class="survey-option${mine ? ' assigned-to-me' : ''}">
+      <article
+        class="survey-option${mine ? ' assigned-to-me' : ''}${isRequestedSurvey(round.id, siteId) ? ' requested-survey' : ''}"
+        data-requested-survey="${round.id}:${siteId}">
         <div>
           <h3>${escapeHtml(site.name || 'Unknown site')}</h3>
           <p class="survey-meta">${escapeHtml(round.name)}</p>
           <span class="survey-date-badge">${escapeHtml(fmtDate(round.survey_date))}</span>
           ${site.address ? `<p class="survey-meta" style="margin-top:7px">${escapeHtml(site.address)}</p>` : ''}
+          ${isRequestedSurvey(round.id, siteId) ? '<span class="requested-badge">Selected from schedule</span>' : ''}
           ${mine ? '<span class="my-badge">Assigned to you</span>' : ''}
           ${mapButton(site)}
         </div>
@@ -179,6 +253,8 @@ function renderSchedule() {
         </div>
       </article>`;
   }).join('');
+
+  scrollToRequestedSurvey();
 }
 
 async function assignSelf(roundId, siteId, button) {

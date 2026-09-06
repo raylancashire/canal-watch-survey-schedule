@@ -260,6 +260,18 @@ function contactHtml(a){
  }).join(' ');
 }
 
+function volunteerSignupHtml(r,a){
+ const url=`volunteer.html?round=${encodeURIComponent(r.id)}&site=${encodeURIComponent(a.survey_site_id)}`;
+ return `
+   <a
+     class="volunteer-signup-link"
+     href="${url}"
+     target="_blank"
+     rel="noopener">
+     Volunteer sign-up
+   </a>`;
+}
+
 function row(r,a){
  const names=namesFor(a);
  const covered=a.status==='complete'||names.length>0;
@@ -274,6 +286,7 @@ function row(r,a){
      <strong>${escapeHtml(siteName(a.survey_site_id))}</strong><br>
      <small>${escapeHtml(r.name)}</small>
      ${mapDisclosureHtml(a.survey_site_id)}
+     ${volunteerSignupHtml(r,a)}
    </td>
    <td>${fmtDate(r.survey_date)}</td>
    <td class="assignment-column">${assigned}</td>
