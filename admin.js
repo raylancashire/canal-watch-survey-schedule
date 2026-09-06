@@ -575,6 +575,23 @@ function openSite(id){
          placeholder="word.word.word">
      </label>
 
+     <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+       <button
+         type="button"
+         class="secondary"
+         id="findThreeWordsBtn">
+         Find three-word location
+       </button>
+     </div>
+
+     <p class="help-text" id="threeWordsHelp" style="margin-top:8px;">
+       Uses the GPS coordinates above. The coordinates will be copied and the what3words map opened in a new tab.
+     </p>
+
+     <p class="help-text" style="margin-top:4px;">
+       <strong>Note:</strong> Automatic conversion from GPS coordinates to a three-word address requires a paid what3words API plan. This button uses the free manual method.
+     </p>
+
      <label class="inline-check">
        <input id="sActive" type="checkbox" ${s.active?'checked':''}>
        Active site
@@ -616,6 +633,58 @@ function openSite(id){
       await loadAll();
     }
   );
+
+  const threeWordsButton=$('findThreeWordsBtn');
+
+  if(threeWordsButton){
+    threeWordsButton.onclick=async()=>{
+      const lat=$('sLat').value.trim();
+      const lon=$('sLon').value.trim();
+      const help=$('threeWordsHelp');
+
+      if(!lat||!lon){
+        alert('Enter both GPS latitude and longitude first.');
+        return;
+      }
+
+      const latNum=Number(lat);
+      const lonNum=Number(lon);
+
+      if(
+        !Number.isFinite(latNum) ||
+        !Number.isFinite(lonNum) ||
+        latNum < -90 ||
+        latNum > 90 ||
+        lonNum < -180 ||
+        lonNum > 180
+      ){
+        alert('Enter valid GPS latitude and longitude values.');
+        return;
+      }
+
+      const coordinates=`${latNum}, ${lonNum}`;
+
+      try{
+        await navigator.clipboard.writeText(coordinates);
+
+        if(help){
+          help.textContent=
+            `Coordinates copied: ${coordinates}. Paste them into the what3words search box, then copy the resulting three-word address back into this panel.`;
+        }
+      }catch{
+        if(help){
+          help.textContent=
+            `Use these coordinates in what3words: ${coordinates}`;
+        }
+      }
+
+      window.open(
+        'https://what3words.com/',
+        '_blank',
+        'noopener'
+      );
+    };
+  }
 }
 
 function openTeam(id){
