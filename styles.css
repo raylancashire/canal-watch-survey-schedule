@@ -251,3 +251,18 @@ footer{background:#e5ebe7;padding:20px 0;color:#536259;font-size:.9rem}
     padding: 9px 11px;
   }
 }
+/* Keep survey-site actions on one line */
+.site-map-disclosure {
+  display: inline-block;
+  margin-top: 8px;
+  margin-right: 8px;
+  vertical-align: top;
+}
+
+.volunteer-signup-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+  vertical-align: top;
+}
