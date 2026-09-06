@@ -251,23 +251,59 @@ footer{background:#e5ebe7;padding:20px 0;color:#536259;font-size:.9rem}
     padding: 9px 11px;
   }
 }
-/* Keep survey title, subtitle and actions neatly aligned */
-table td:first-child > small {
-  display: block;
-}
 
-/* Survey-site action buttons */
-.site-map-disclosure {
-  display: inline-block;
-  margin-top: 8px;
-  margin-right: 8px;
-  vertical-align: top;
-}
 
-.volunteer-signup-link {
-  display: inline-flex;
+/* ============================================================
+   Full-width map row in Upcoming Surveys
+   ============================================================ */
+
+.survey-site-actions {
+  display: flex;
   align-items: center;
-  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 8px;
-  vertical-align: top;
+}
+
+.survey-site-actions .site-map-toggle,
+.survey-site-actions .volunteer-signup-link {
+  margin: 0;
+}
+
+.site-map-table-row > td {
+  padding: 0 10px 16px;
+  border-bottom: 1px solid #e4ebe6;
+}
+
+.survey-main-row:has(+ .site-map-table-row:not(.hidden)) > td {
+  border-bottom: 0;
+}
+
+.site-map-full-panel {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d7e2da;
+  border-radius: 10px;
+  background: #fbfdfb;
+}
+
+.site-map-canvas-full {
+  width: 100%;
+  height: 340px;
+  min-width: 0;
+}
+
+.embedded-schedule .site-map-canvas-full {
+  height: 320px;
+}
+
+@media (max-width: 600px) {
+  .site-map-canvas-full {
+    height: 360px;
+  }
+
+  .site-map-table-row > td {
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
