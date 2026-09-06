@@ -244,9 +244,9 @@ function renderSchedule() {
           ${site.address ? `<p class="survey-meta" style="margin-top:7px">${escapeHtml(site.address)}</p>` : ''}
           ${isRequestedSurvey(round.id, siteId) ? '<span class="requested-badge">Selected from schedule</span>' : ''}
           ${mine ? '<span class="my-badge">Assigned to you</span>' : ''}
-          ${mapButton(site)}
         </div>
-        <div>
+        <div class="survey-card-actions">
+          ${mapButton(site)}
           ${mine
             ? `<button class="volunteer-button danger" type="button" data-unassign="${assignment.id}">Remove me</button>`
             : `<button class="volunteer-button" type="button" data-assign-round="${round.id}" data-assign-site="${siteId}">Assign me</button>`}
