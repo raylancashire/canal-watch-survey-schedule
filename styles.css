@@ -251,7 +251,12 @@ footer{background:#e5ebe7;padding:20px 0;color:#536259;font-size:.9rem}
     padding: 9px 11px;
   }
 }
-/* Keep survey-site actions on one line */
+/* Keep survey title, subtitle and actions neatly aligned */
+table td:first-child > small {
+  display: block;
+}
+
+/* Survey-site action buttons */
 .site-map-disclosure {
   display: inline-block;
   margin-top: 8px;
