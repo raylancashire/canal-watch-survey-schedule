@@ -183,6 +183,7 @@ function render(){
         <div>
           <strong>${esc(t.name)}</strong><br>
           <small>Coordinator: ${esc(volunteerName(t.coordinator_id))}</small>
+          ${t.email?`<br><small>Team email: ${esc(t.email)}</small>`:''}
           <div class="assignment-summary">
             ${mem.map(n=>`<span class="pill">${esc(n)}</span>`).join('')}
           </div>
@@ -620,7 +621,7 @@ function openSite(id){
 function openTeam(id){
   const t=id
     ? db.teams.find(x=>x.id===id)
-    : {name:'',coordinator_id:null,active:true};
+    : {name:'',email:'',coordinator_id:null,active:true};
 
   const memberIds=id
     ? db.members.filter(m=>m.team_id===id).map(m=>m.volunteer_id)
@@ -630,10 +631,21 @@ function openTeam(id){
 
   openModal(
     id?'Edit project team':'Add project team',
-    `<label class="field">
-       Team name
-       <input id="tName" value="${esc(t.name)}">
-     </label>
+    `<div class="form-grid">
+       <label class="field">
+         Team name
+         <input id="tName" value="${esc(t.name)}">
+       </label>
+
+       <label class="field">
+         Team email address (optional)
+         <input
+           id="tEmail"
+           type="email"
+           value="${esc(t.email||'')}"
+           placeholder="canalwatch@example.org">
+       </label>
+     </div>
 
      <div class="picker-section">
        <h3>Team members and coordinator</h3>
@@ -677,6 +689,7 @@ function openTeam(id){
      </label>`,
     async()=>{
       const name=$('tName').value.trim();
+      const email=$('tEmail').value.trim()||null;
 
       const members=[
         ...document.querySelectorAll('[data-member].selected')
@@ -701,6 +714,7 @@ function openTeam(id){
           .from('project_teams')
           .update({
             name,
+            email,
             coordinator_id,
             active:$('tActive').checked
           })
@@ -712,6 +726,7 @@ function openTeam(id){
           .from('project_teams')
           .insert({
             name,
+            email,
             coordinator_id,
             active:$('tActive').checked
           })
