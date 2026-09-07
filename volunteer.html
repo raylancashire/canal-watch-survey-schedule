@@ -346,6 +346,68 @@
       }
     }
 
+
+    .unregistered-contact-actions { margin-top: 12px; }
+
+    .contact-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(17,31,23,.48);
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      z-index: 50;
+    }
+
+    .contact-modal {
+      width: min(620px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.24);
+    }
+
+    .contact-modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .contact-modal-head h2 { margin: 0; }
+
+    .contact-modal-close {
+      border: 0;
+      border-radius: 8px;
+      background: #eef2ef;
+      color: #24382d;
+      font-size: 1.5rem;
+      padding: 5px 11px;
+      cursor: pointer;
+    }
+
+    .contact-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 14px;
+      font-size: .85rem;
+      font-weight: 700;
+      color: #56645c;
+    }
+
+    .contact-field input,
+    .contact-field textarea { width: 100%; }
+
+    .contact-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
   </style>
 </head>
 
@@ -414,6 +476,42 @@
     </section>
 
   </main>
+
+
+  <div class="contact-modal-backdrop hidden" id="volunteerContactBackdrop">
+    <section class="contact-modal" role="dialog" aria-modal="true" aria-labelledby="volunteerContactTitle">
+      <div class="contact-modal-head">
+        <h2 id="volunteerContactTitle">Contact Canal Watch</h2>
+        <button type="button" class="contact-modal-close" id="volunteerContactClose" aria-label="Close">×</button>
+      </div>
+
+      <p>Send a message if you would like to register as a Canal Watch volunteer.</p>
+
+      <form id="volunteerContactForm">
+        <label class="contact-field">
+          Your name
+          <input id="volunteerContactName" required>
+        </label>
+
+        <label class="contact-field">
+          Your email
+          <input id="volunteerContactEmail" type="email" readonly>
+        </label>
+
+        <label class="contact-field">
+          Message
+          <textarea id="volunteerContactMessage" rows="6" required>I would like to register as a Canal Watch volunteer.</textarea>
+        </label>
+
+        <div id="volunteerContactStatus"></div>
+
+        <div class="contact-modal-actions">
+          <button type="button" class="volunteer-button secondary" id="volunteerContactCancel">Cancel</button>
+          <button type="submit" class="volunteer-button" id="volunteerContactSend">Send message</button>
+        </div>
+      </form>
+    </section>
+  </div>
 
   <script type="module" src="volunteer.js"></script>
 </body>

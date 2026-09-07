@@ -391,7 +391,35 @@ async function showPortal() {
   } catch (error) {
     $('portalCard').classList.add('hidden');
     $('loginCard').classList.remove('hidden');
-    setMessage($('loginMessage'), error.message || 'Unable to open the volunteer portal.', true);
+    const isUnregistered =
+      String(error.message || '').toLowerCase().includes('no active canal watch volunteer record');
+
+    if (isUnregistered) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const signedInEmail = sessionData.session?.user?.email || '';
+
+      $('loginMessage').innerHTML = `
+        <div class="notice-box error">
+          <strong>This email address is not registered as a Canal Watch volunteer.</strong>
+          <p>Please contact Canal Watch if you would like to take part.</p>
+          <div class="unregistered-contact-actions">
+            <button type="button" class="volunteer-button" id="openVolunteerContact">
+              Contact Canal Watch
+            </button>
+          </div>
+        </div>`;
+
+      const contactButton = $('openVolunteerContact');
+      if (contactButton) {
+        contactButton.onclick = () => openVolunteerContactForm(signedInEmail);
+      }
+    } else {
+      setMessage(
+        $('loginMessage'),
+        error.message || 'Unable to open the volunteer portal.',
+        true
+      );
+    }
   }
 }
 
@@ -448,6 +476,67 @@ document.addEventListener('click', async (event) => {
     await toggleMap(Number(mapButton.dataset.siteMapToggle), mapButton);
   }
 });
+
+
+function openVolunteerContactForm(email) {
+  $('volunteerContactEmail').value = email || '';
+  $('volunteerContactStatus').innerHTML = '';
+  $('volunteerContactBackdrop').classList.remove('hidden');
+}
+
+function closeVolunteerContactForm() {
+  $('volunteerContactBackdrop').classList.add('hidden');
+  $('volunteerContactStatus').innerHTML = '';
+}
+
+$('volunteerContactClose').onclick = closeVolunteerContactForm;
+$('volunteerContactCancel').onclick = closeVolunteerContactForm;
+
+$('volunteerContactBackdrop').addEventListener('click', event => {
+  if (event.target === $('volunteerContactBackdrop')) {
+    closeVolunteerContactForm();
+  }
+});
+
+$('volunteerContactForm').addEventListener('submit', async event => {
+  event.preventDefault();
+
+  const sendButton = $('volunteerContactSend');
+  const status = $('volunteerContactStatus');
+
+  sendButton.disabled = true;
+  sendButton.textContent = 'Sending…';
+  status.innerHTML = '<div class="notice-box">Sending your message…</div>';
+
+  const { data, error } = await supabase.functions.invoke('contact-canal-watch', {
+    body: {
+      name: $('volunteerContactName').value.trim(),
+      email: $('volunteerContactEmail').value.trim(),
+      message: $('volunteerContactMessage').value.trim(),
+      requested_round_id: requestedRoundId,
+      requested_site_id: requestedSiteId
+    }
+  });
+
+  if (error || data?.error) {
+    status.innerHTML = `<div class="notice-box error">${
+      escapeHtml(data?.error || error?.message || 'Unable to send your message.')
+    }</div>`;
+
+    sendButton.disabled = false;
+    sendButton.textContent = 'Send message';
+    return;
+  }
+
+  status.innerHTML =
+    '<div class="notice-box">Thank you. Your message has been sent to Canal Watch.</div>';
+
+  sendButton.disabled = false;
+  sendButton.textContent = 'Send message';
+
+  setTimeout(closeVolunteerContactForm, 1400);
+});
+
 
 supabase.auth.onAuthStateChange(async (_event, session) => {
   if (session?.user) await showPortal();
