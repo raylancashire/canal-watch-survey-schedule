@@ -352,3 +352,11 @@ footer{background:#e5ebe7;padding:20px 0;color:#536259;font-size:.9rem}
   margin-top: 5px;
   font-size: 12px;
 }
+
+
+.map-water-result-date {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #5f6f64;
+}

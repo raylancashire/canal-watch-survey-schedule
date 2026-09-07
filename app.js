@@ -235,7 +235,9 @@ async function loadWaterQualityAssessments(){
        const dateValue=waterDateValue(waterSampleDate(record));
        const current=latest.get(siteKey);
 
-       if(!current||dateValue>=current.dateValue){
+       // Match the main Canal Watch map:
+       // use a newer survey date, but keep the first CSV record when dates tie.
+       if(!current||dateValue>current.dateValue){
          latest.set(siteKey,{
            record,
            dateValue,
@@ -421,9 +423,17 @@ async function openSiteMap(mapKey,siteId){
      };
 
      if(latestWater){
+       const resultDate=waterSampleDate(latestWater.record);
+
        popupParts.push(
          `<br><span class="map-water-result-label">Latest water-quality assessment: <strong>${escapeHtml(assessment.label)}</strong></span>`
        );
+
+       if(resultDate){
+         popupParts.push(
+           `<br><span class="map-water-result-date">Water survey: ${escapeHtml(resultDate)}</span>`
+         );
+       }
      }else{
        popupParts.push(
          '<br><span class="map-water-result-label">No matching current water-quality assessment</span>'
