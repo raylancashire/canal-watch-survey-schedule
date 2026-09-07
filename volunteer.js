@@ -9,6 +9,18 @@ const requestedRoundId = Number(portalParams.get('round')) || null;
 const requestedSiteId = Number(portalParams.get('site')) || null;
 let requestedSurveyHandled = false;
 
+let authCleanupSent = false;
+
+function tellWebadorAuthComplete() {
+  if (authCleanupSent || window.parent === window) return;
+  authCleanupSent = true;
+  window.parent.postMessage(
+    { type: 'canal-watch-volunteer-auth-complete' },
+    'https://www.queensparktrust.org'
+  );
+}
+
+
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[c]));
@@ -36,7 +48,7 @@ function setMessage(target, text, error = false) {
 
 async function sendMagicLink(email) {
   const redirectUrl = new URL(
-    'https://raylancashire.github.io/canal-watch-survey-schedule/volunteer.html'
+    'https://www.queensparktrust.org/what-we-do/canal-watch/canal-watch-volunteer'
   );
 
   if (requestedRoundId && requestedSiteId) {
@@ -384,6 +396,7 @@ async function toggleMap(siteId, button) {
 async function showPortal() {
   try {
     await claimVolunteerProfile();
+    tellWebadorAuthComplete();
     $('signedInAs').textContent = `Signed in as ${volunteer.name}`;
     $('loginCard').classList.add('hidden');
     $('portalCard').classList.remove('hidden');

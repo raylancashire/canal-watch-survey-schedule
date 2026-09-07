@@ -17,7 +17,7 @@ function clean(value: unknown, max = 5000) {
   return String(value ?? "").trim().slice(0, max);
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return reply({ error: "Method not allowed." }, 405);
 
@@ -25,27 +25,30 @@ Deno.serve(async (req) => {
   const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
   const fromEmail = Deno.env.get("CONTACT_FROM_EMAIL");
+  const contactEmail = Deno.env.get("CANAL_WATCH_CONTACT_EMAIL");
 
   if (!supabaseUrl || !serviceRole) {
     return reply({ error: "Server configuration is incomplete." }, 500);
   }
 
-  if (!resendApiKey || !fromEmail) {
-    return reply({ error: "Coordinator email sending has not yet been configured." }, 503);
+  if (!resendApiKey || !fromEmail || !contactEmail) {
+    return reply({ error: "Canal Watch contact email has not yet been configured." }, 503);
   }
 
   let body: Record<string, unknown>;
-  try { body = await req.json(); }
-  catch { return reply({ error: "Invalid request." }, 400); }
+  try {
+    body = await req.json();
+  } catch {
+    return reply({ error: "Invalid request." }, 400);
+  }
 
-  const teamId = Number(body.team_id);
-  const senderName = clean(body.sender_name, 120);
-  const senderEmail = clean(body.sender_email, 254);
-  const subject = clean(body.subject, 180);
+  const name = clean(body.name, 120);
+  const email = clean(body.email, 254);
   const message = clean(body.message, 6000);
+  const roundId = body.requested_round_id ? Number(body.requested_round_id) : null;
+  const siteId = body.requested_site_id ? Number(body.requested_site_id) : null;
 
-  if (!Number.isInteger(teamId) || teamId <= 0) return reply({ error: "Invalid project team." }, 400);
-  if (!senderName || !senderEmail.includes("@") || !subject || !message) {
+  if (!name || !email.includes("@") || !message) {
     return reply({ error: "Complete all contact fields." }, 400);
   }
 
@@ -53,33 +56,29 @@ Deno.serve(async (req) => {
     auth: { autoRefreshToken: false, persistSession: false }
   });
 
-  const { data: team, error: teamError } = await db
-    .from("project_teams")
-    .select("id,name,coordinator_id,active")
-    .eq("id", teamId)
-    .eq("active", true)
-    .single();
+  let context = "";
 
-  if (teamError || !team) return reply({ error: "Project team not found." }, 404);
+  if (roundId && siteId) {
+    const [{ data: round }, { data: site }] = await Promise.all([
+      db.from("survey_rounds").select("name,survey_date").eq("id", roundId).maybeSingle(),
+      db.from("survey_sites").select("name").eq("id", siteId).maybeSingle()
+    ]);
 
-  const { data: coordinator, error: coordinatorError } = await db
-    .from("volunteers")
-    .select("name,email,active")
-    .eq("id", team.coordinator_id)
-    .eq("active", true)
-    .single();
-
-  if (coordinatorError || !coordinator) return reply({ error: "Coordinator not found." }, 404);
-  if (!coordinator.email) return reply({ error: "This coordinator does not currently have an email address." }, 400);
+    context = [
+      round?.name ? `Round: ${round.name}` : "",
+      round?.survey_date ? `Date: ${round.survey_date}` : "",
+      site?.name ? `Site: ${site.name}` : ""
+    ].filter(Boolean).join("\n");
+  }
 
   const text = [
-    "Canal Watch survey enquiry",
+    "Canal Watch volunteer registration enquiry",
     "",
-    `Project team: ${team.name}`,
-    `Coordinator: ${coordinator.name}`,
+    `Name: ${name}`,
+    `Email: ${email}`,
+    context ? `\nSelected survey:\n${context}` : "",
     "",
-    `From: ${senderName} <${senderEmail}>`,
-    "",
+    "Message:",
     message
   ].join("\n");
 
@@ -91,9 +90,9 @@ Deno.serve(async (req) => {
     },
     body: JSON.stringify({
       from: fromEmail,
-      to: [coordinator.email],
-      reply_to: senderEmail,
-      subject: `[Canal Watch] ${subject}`,
+      to: [contactEmail],
+      reply_to: email,
+      subject: "[Canal Watch] Volunteer registration enquiry",
       text
     })
   });

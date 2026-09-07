@@ -289,13 +289,15 @@ function contactHtml(a){
 }
 
 function volunteerSignupHtml(r,a){
- const url=`volunteer.html?round=${encodeURIComponent(r.id)}&site=${encodeURIComponent(a.survey_site_id)}`;
+ const url=new URL('https://www.queensparktrust.org/what-we-do/canal-watch/canal-watch-volunteer');
+ url.searchParams.set('round',String(r.id));
+ url.searchParams.set('site',String(a.survey_site_id));
+
  return `
    <a
      class="volunteer-signup-link"
-     href="${url}"
-     target="_blank"
-     rel="noopener">
+     href="${url.toString()}"
+     target="_top">
      Volunteer sign-up
    </a>`;
 }
