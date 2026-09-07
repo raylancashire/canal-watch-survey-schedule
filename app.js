@@ -169,24 +169,48 @@ function waterDateValue(value){
 }
 
 function waterAssessment(record){
- const text=(
-   waterField(record,'Assessment','assessment')+' '+
-   waterField(record,'feedback_eng','Feedback','feedback_core')
- ).toLowerCase();
+ const explicitAssessment=
+   waterField(record,'Assessment','assessment').trim().toLowerCase();
 
- if(text.includes('very poor')){
+ // Prefer the explicit assessment value from freshwater.csv.
+ // This keeps the Survey Schedule map consistent with the main Canal Watch map.
+ if(explicitAssessment){
+   if(explicitAssessment==='very poor'){
+     return {label:'Very Poor',key:'very-poor'};
+   }
+   if(explicitAssessment==='excellent'||explicitAssessment==='very good'){
+     return {label:'Excellent',key:'excellent'};
+   }
+   if(explicitAssessment==='good'){
+     return {label:'Good',key:'good'};
+   }
+   if(explicitAssessment==='fair'||explicitAssessment==='moderate'){
+     return {label:'Fair',key:'fair'};
+   }
+   if(explicitAssessment==='poor'){
+     return {label:'Poor',key:'poor'};
+   }
+ }
+
+ // Only fall back to descriptive feedback when there is no usable Assessment.
+ const feedback=
+   waterField(record,'feedback_eng','Feedback','feedback_core')
+     .trim()
+     .toLowerCase();
+
+ if(feedback.includes('very poor')){
    return {label:'Very Poor',key:'very-poor'};
  }
- if(text.includes('excellent')||text.includes('very good')){
+ if(feedback.includes('excellent')||feedback.includes('very good')){
    return {label:'Excellent',key:'excellent'};
  }
- if(text.includes('good')){
+ if(feedback.includes('good')){
    return {label:'Good',key:'good'};
  }
- if(text.includes('fair')||text.includes('moderate')){
+ if(feedback.includes('fair')||feedback.includes('moderate')){
    return {label:'Fair',key:'fair'};
  }
- if(text.includes('poor')){
+ if(feedback.includes('poor')){
    return {label:'Poor',key:'poor'};
  }
 
