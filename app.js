@@ -14,6 +14,16 @@ let leafletPromise=null;
 let openSiteMapKey=null;
 const siteMaps=new Map();
 
+/*
+ * Reuse the live Canal Watch FreshWater Watch dataset.
+ * No survey-scheduler database fields are required.
+ */
+const WATER_QUALITY_CSV_URL =
+  'https://raylancashire.github.io/queens-park-canal-map/freshwater.csv';
+
+let waterQualityPromise=null;
+let latestWaterQualityBySite=new Map();
+
 function loadLeaflet(){
  if(window.L)return Promise.resolve(window.L);
  if(leafletPromise)return leafletPromise;
@@ -43,6 +53,212 @@ function loadLeaflet(){
  });
 
  return leafletPromise;
+}
+
+
+function parseCsv(text){
+ const rows=[];
+ let row=[];
+ let field='';
+ let quoted=false;
+
+ for(let i=0;i<text.length;i++){
+   const char=text[i];
+
+   if(quoted){
+     if(char==='"'){
+       if(text[i+1]==='"'){
+         field+='"';
+         i++;
+       }else{
+         quoted=false;
+       }
+     }else{
+       field+=char;
+     }
+     continue;
+   }
+
+   if(char==='"'){
+     quoted=true;
+   }else if(char===','){
+     row.push(field);
+     field='';
+   }else if(char==='\n'){
+     row.push(field);
+     rows.push(row);
+     row=[];
+     field='';
+   }else if(char!=='\r'){
+     field+=char;
+   }
+ }
+
+ if(field!==''||row.length){
+   row.push(field);
+   rows.push(row);
+ }
+
+ if(!rows.length)return [];
+
+ const headers=rows[0].map(h=>String(h||'').trim());
+
+ return rows.slice(1)
+   .filter(r=>r.some(v=>String(v||'').trim()!==''))
+   .map(r=>{
+     const item={};
+     headers.forEach((h,index)=>{
+       item[h]=String(r[index]??'').trim();
+     });
+     return item;
+   });
+}
+
+function waterField(record,...names){
+ for(const name of names){
+   if(Object.prototype.hasOwnProperty.call(record,name)){
+     const value=record[name];
+     if(value!==undefined&&value!==null&&String(value).trim()!==''){
+       return String(value).trim();
+     }
+   }
+ }
+ return '';
+}
+
+function normaliseWaterSiteName(value){
+ return String(value||'')
+   .toLowerCase()
+   .replace(/^grand\s+union\s+canal\s*[-–—:]\s*/,'')
+   .replace(/\b(sampling\s+)?site\b/g,' ')
+   .replace(/\bgroup\b/g,' ')
+   .replace(/&/g,' and ')
+   .replace(/[^a-z0-9]+/g,' ')
+   .replace(/\s+/g,' ')
+   .trim();
+}
+
+function waterSiteName(record){
+ return waterField(
+   record,
+   'Site Name','site_name','Site','site',
+   'Sampling Site','sampling_site'
+ );
+}
+
+function waterSampleDate(record){
+ return waterField(record,'Sample Date','sample_date','Date','date');
+}
+
+function waterDateValue(value){
+ const raw=String(value||'').trim();
+ if(!raw)return 0;
+
+ let match=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+ if(match){
+   return Date.UTC(Number(match[1]),Number(match[2])-1,Number(match[3]));
+ }
+
+ match=raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/);
+ if(match){
+   return Date.UTC(Number(match[3]),Number(match[2])-1,Number(match[1]));
+ }
+
+ const parsed=Date.parse(raw);
+ return Number.isNaN(parsed)?0:parsed;
+}
+
+function waterAssessment(record){
+ const text=(
+   waterField(record,'Assessment','assessment')+' '+
+   waterField(record,'feedback_eng','Feedback','feedback_core')
+ ).toLowerCase();
+
+ if(text.includes('very poor')){
+   return {label:'Very Poor',key:'very-poor'};
+ }
+ if(text.includes('excellent')||text.includes('very good')){
+   return {label:'Excellent',key:'excellent'};
+ }
+ if(text.includes('good')){
+   return {label:'Good',key:'good'};
+ }
+ if(text.includes('fair')||text.includes('moderate')){
+   return {label:'Fair',key:'fair'};
+ }
+ if(text.includes('poor')){
+   return {label:'Poor',key:'poor'};
+ }
+
+ return {label:'Not yet assessed',key:'unrated'};
+}
+
+async function loadWaterQualityAssessments(){
+ if(waterQualityPromise)return waterQualityPromise;
+
+ waterQualityPromise=(async()=>{
+   try{
+     const response=await fetch(WATER_QUALITY_CSV_URL,{cache:'no-store'});
+     if(!response.ok)throw new Error(`HTTP ${response.status}`);
+
+     const records=parseCsv(await response.text());
+     const latest=new Map();
+
+     records.forEach(record=>{
+       const siteKey=normaliseWaterSiteName(waterSiteName(record));
+       if(!siteKey)return;
+
+       const dateValue=waterDateValue(waterSampleDate(record));
+       const current=latest.get(siteKey);
+
+       if(!current||dateValue>=current.dateValue){
+         latest.set(siteKey,{
+           record,
+           dateValue,
+           assessment:waterAssessment(record)
+         });
+       }
+     });
+
+     latestWaterQualityBySite=latest;
+   }catch(error){
+     console.warn('Canal Watch water-quality pin data could not be loaded:',error);
+     latestWaterQualityBySite=new Map();
+   }
+
+   return latestWaterQualityBySite;
+ })();
+
+ return waterQualityPromise;
+}
+
+function latestWaterQualityForSurveySite(site){
+ const wanted=normaliseWaterSiteName(site?.name);
+ if(!wanted)return null;
+
+ // Exact normalised-name match first.
+ const exact=latestWaterQualityBySite.get(wanted);
+ if(exact)return exact;
+
+ // Safe fallback for names such as "Half Penny Steps" / "Half Penny Steps Group".
+ for(const [key,value] of latestWaterQualityBySite.entries()){
+   if(key===wanted||key.includes(wanted)||wanted.includes(key)){
+     return value;
+   }
+ }
+
+ return null;
+}
+
+function waterResultPinHtml(assessment){
+ const key=assessment?.key||'unrated';
+
+ return `
+   <div
+     class="water-result-map-pin ${key}"
+     aria-hidden="true">
+     <span></span>
+   </div>`;
 }
 
 function siteFor(id){
@@ -174,7 +390,31 @@ async function openSiteMap(mapKey,siteId){
        );
      }
 
-     L.marker([lat,lon])
+     const latestWater=latestWaterQualityForSurveySite(site);
+     const assessment=latestWater?.assessment||{
+       label:'No current water result',
+       key:'unrated'
+     };
+
+     if(latestWater){
+       popupParts.push(
+         `<br><span class="map-water-result-label">Latest water-quality assessment: <strong>${escapeHtml(assessment.label)}</strong></span>`
+       );
+     }else{
+       popupParts.push(
+         '<br><span class="map-water-result-label">No matching current water-quality assessment</span>'
+       );
+     }
+
+     const waterIcon=L.divIcon({
+       className:'water-result-map-pin-wrapper',
+       html:waterResultPinHtml(assessment),
+       iconSize:[30,42],
+       iconAnchor:[15,42],
+       popupAnchor:[0,-38]
+     });
+
+     L.marker([lat,lon],{icon:waterIcon})
        .addTo(map)
        .bindPopup(popupParts.join(''))
        .openPopup();
@@ -216,6 +456,9 @@ function setupSiteMapDisclosures(){
 
 
 async function load(){
+ // Load the live FreshWater Watch assessment data in parallel with Supabase.
+ const waterLoad=loadWaterQualityAssessments();
+
  const queries=await Promise.all([
   supabase.from('survey_rounds').select('*').neq('status','inactive').gte('survey_date',today()).order('survey_date'),
   supabase.from('survey_sites').select('*').eq('active',true),
@@ -234,6 +477,10 @@ async function load(){
  }
 
  [db.rounds,db.sites,db.teams,db.volunteers,db.roundSites,db.assignments,db.assignmentTeams,db.assignmentVolunteers]=queries.map(q=>q.data||[]);
+
+ // Do not block the schedule if the external CSV is temporarily unavailable.
+ await waterLoad;
+
  renderFilter();
  renderAll();
 }

@@ -307,3 +307,48 @@ footer{background:#e5ebe7;padding:20px 0;color:#536259;font-size:.9rem}
     padding-right: 0;
   }
 }
+
+
+/* ============================================================
+   Survey View map pin — latest live FreshWater Watch assessment
+   Data source: queens-park-canal-map/freshwater.csv
+   ============================================================ */
+
+.water-result-map-pin-wrapper {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.water-result-map-pin {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,.35);
+}
+
+.water-result-map-pin span {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  left: 8px;
+  top: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.96);
+}
+
+/* Existing Canal Watch assessment colours */
+.water-result-map-pin.excellent { background: #006400; }
+.water-result-map-pin.good { background: #00a86b; }
+.water-result-map-pin.fair { background: #ffd966; }
+.water-result-map-pin.poor { background: #f4b183; }
+.water-result-map-pin.very-poor { background: #c00000; }
+.water-result-map-pin.unrated { background: #777777; }
+
+.map-water-result-label {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 12px;
+}
