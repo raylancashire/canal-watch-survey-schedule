@@ -532,7 +532,7 @@ async function load(){
  const waterLoad=loadWaterQualityAssessments();
 
  const queries=await Promise.all([
-  supabase.from('survey_rounds').select('*').neq('status','inactive').gte('survey_date',today()).order('survey_date'),
+  supabase.from('survey_rounds').select('*').eq('status','planned').gte('survey_date',today()).order('survey_date'),
   supabase.from('survey_sites').select('*').eq('active',true),
   supabase.from('project_teams').select('*').eq('active',true),
   supabase.from('volunteers').select('id,name,active').eq('active',true),
