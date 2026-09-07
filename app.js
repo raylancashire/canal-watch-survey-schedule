@@ -150,67 +150,75 @@ function waterSampleDate(record){
  return waterField(record,'Sample Date','sample_date','Date','date');
 }
 
+function waterSampleTime(record){
+ return waterField(record,'Sample Time','sample_time','Time','time');
+}
+
 function waterDateValue(value){
- const raw=String(value||'').trim();
- if(!raw)return 0;
+ if(!value)return 0;
 
- let match=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
- if(match){
-   return Date.UTC(Number(match[1]),Number(match[2])-1,Number(match[3]));
+ const parsed=Date.parse(value);
+ if(!Number.isNaN(parsed))return parsed;
+
+ const m=String(value).trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+ if(m){
+   return new Date(Number(m[3]),Number(m[2])-1,Number(m[1])).getTime();
  }
 
- match=raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/);
- if(match){
-   return Date.UTC(Number(match[3]),Number(match[2])-1,Number(match[1]));
+ return 0;
+}
+
+function waterTimeValue(value){
+ const m=String(value||'').match(/^(\d{1,2}):(\d{2})/);
+ return m ? Number(m[1])*60+Number(m[2]) : 0;
+}
+
+function formatWaterDateUK(value){
+ if(!value)return '';
+
+ const raw=String(value).trim();
+
+ // FreshWater Watch exports commonly use M/D/YYYY.
+ const us=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+ if(us){
+   const month=Number(us[1]);
+   const day=Number(us[2]);
+   const year=us[3];
+
+   return `${String(day).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`;
  }
 
- const parsed=Date.parse(raw);
- return Number.isNaN(parsed)?0:parsed;
+ // ISO date.
+ const iso=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+ if(iso){
+   return `${String(iso[3]).padStart(2,'0')}/${String(iso[2]).padStart(2,'0')}/${iso[1]}`;
+ }
+
+ // Already UK-looking: leave in DD/MM/YYYY form.
+ const uk=raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+ if(uk){
+   return `${String(uk[1]).padStart(2,'0')}/${String(uk[2]).padStart(2,'0')}/${uk[3]}`;
+ }
+
+ return raw;
 }
 
 function waterAssessment(record){
- const explicitAssessment=
-   waterField(record,'Assessment','assessment').trim().toLowerCase();
-
- // Prefer the explicit assessment value from freshwater.csv.
- // This keeps the Survey Schedule map consistent with the main Canal Watch map.
- if(explicitAssessment){
-   if(explicitAssessment==='very poor'){
-     return {label:'Very Poor',key:'very-poor'};
-   }
-   if(explicitAssessment==='excellent'||explicitAssessment==='very good'){
-     return {label:'Excellent',key:'excellent'};
-   }
-   if(explicitAssessment==='good'){
-     return {label:'Good',key:'good'};
-   }
-   if(explicitAssessment==='fair'||explicitAssessment==='moderate'){
-     return {label:'Fair',key:'fair'};
-   }
-   if(explicitAssessment==='poor'){
-     return {label:'Poor',key:'poor'};
-   }
- }
-
- // Only fall back to descriptive feedback when there is no usable Assessment.
- const feedback=
+ const text=(
+   waterField(record,'Assessment','assessment')+' '+
    waterField(record,'feedback_eng','Feedback','feedback_core')
-     .trim()
-     .toLowerCase();
+ ).toLowerCase();
 
- if(feedback.includes('very poor')){
-   return {label:'Very Poor',key:'very-poor'};
- }
- if(feedback.includes('excellent')||feedback.includes('very good')){
+ if(text.includes('excellent')||text.includes('very good')){
    return {label:'Excellent',key:'excellent'};
  }
- if(feedback.includes('good')){
+ if(text.includes('good')){
    return {label:'Good',key:'good'};
  }
- if(feedback.includes('fair')||feedback.includes('moderate')){
+ if(text.includes('fair')||text.includes('moderate')){
    return {label:'Fair',key:'fair'};
  }
- if(feedback.includes('poor')){
+ if(text.includes('poor')){
    return {label:'Poor',key:'poor'};
  }
 
@@ -228,22 +236,38 @@ async function loadWaterQualityAssessments(){
      const records=parseCsv(await response.text());
      const latest=new Map();
 
+     const grouped=new Map();
+
      records.forEach(record=>{
        const siteKey=normaliseWaterSiteName(waterSiteName(record));
        if(!siteKey)return;
 
-       const dateValue=waterDateValue(waterSampleDate(record));
-       const current=latest.get(siteKey);
+       if(!grouped.has(siteKey))grouped.set(siteKey,[]);
+       grouped.get(siteKey).push(record);
+     });
 
-       // Match the main Canal Watch map:
-       // use a newer survey date, but keep the first CSV record when dates tie.
-       if(!current||dateValue>current.dateValue){
-         latest.set(siteKey,{
-           record,
-           dateValue,
-           assessment:waterAssessment(record)
-         });
-       }
+     grouped.forEach((rows,siteKey)=>{
+       rows.sort((a,b)=>{
+         const dateDiff=
+           waterDateValue(waterSampleDate(b))-
+           waterDateValue(waterSampleDate(a));
+
+         if(dateDiff!==0)return dateDiff;
+
+         return (
+           waterTimeValue(waterSampleTime(b))-
+           waterTimeValue(waterSampleTime(a))
+         );
+       });
+
+       const record=rows[0];
+
+       latest.set(siteKey,{
+         record,
+         dateValue:waterDateValue(waterSampleDate(record)),
+         timeValue:waterTimeValue(waterSampleTime(record)),
+         assessment:waterAssessment(record)
+       });
      });
 
      latestWaterQualityBySite=latest;
@@ -262,13 +286,20 @@ function latestWaterQualityForSurveySite(site){
  const wanted=normaliseWaterSiteName(site?.name);
  if(!wanted)return null;
 
- // Exact normalised-name match first.
- const exact=latestWaterQualityBySite.get(wanted);
+ const aliases={
+   'meanwhile gardens':'meanwhile gardens',
+   'ladbroke grove bridge':'ladbroke grove bridge',
+   'half penny steps survey':'half penny steps',
+   'half penny steps':'half penny steps'
+ };
+
+ const target=aliases[wanted]||wanted;
+
+ const exact=latestWaterQualityBySite.get(target);
  if(exact)return exact;
 
- // Safe fallback for names such as "Half Penny Steps" / "Half Penny Steps Group".
  for(const [key,value] of latestWaterQualityBySite.entries()){
-   if(key===wanted||key.includes(wanted)||wanted.includes(key)){
+   if(key===target||key.includes(target)||target.includes(key)){
      return value;
    }
  }
@@ -424,6 +455,7 @@ async function openSiteMap(mapKey,siteId){
 
      if(latestWater){
        const resultDate=waterSampleDate(latestWater.record);
+       const matchedCsvSite=waterSiteName(latestWater.record);
 
        popupParts.push(
          `<br><span class="map-water-result-label">Latest water-quality assessment: <strong>${escapeHtml(assessment.label)}</strong></span>`
@@ -431,7 +463,13 @@ async function openSiteMap(mapKey,siteId){
 
        if(resultDate){
          popupParts.push(
-           `<br><span class="map-water-result-date">Water survey: ${escapeHtml(resultDate)}</span>`
+           `<br><span class="map-water-result-date">Last water survey: ${escapeHtml(formatWaterDateUK(resultDate))}</span>`
+         );
+       }
+
+       if(matchedCsvSite){
+         popupParts.push(
+           `<br><span class="map-water-result-source">Matched site: ${escapeHtml(matchedCsvSite.replace(/^Grand Union Canal\s*-\s*/i,''))}</span>`
          );
        }
      }else{
