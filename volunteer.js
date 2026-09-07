@@ -46,6 +46,12 @@ function setMessage(target, text, error = false) {
     : '';
 }
 
+function setLoginHtml(html) {
+  const target = $('loginMessage');
+  if (!target) return;
+  target.innerHTML = html || '';
+}
+
 async function sendMagicLink(email) {
   const redirectUrl = new URL(
     'https://www.queensparktrust.org/what-we-do/canal-watch/canal-watch-volunteer'
@@ -438,17 +444,41 @@ async function showPortal() {
 
 $('loginForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+
   const email = $('emailInput').value.trim();
   const button = $('loginButton');
+
   button.disabled = true;
   button.textContent = 'Sending…';
-  setMessage($('loginMessage'), '');
+
+  setLoginHtml(`
+    <div class="notice-box">
+      <strong>Sending your secure sign-in link…</strong>
+      Please wait a moment.
+    </div>
+  `);
 
   const { error } = await sendMagicLink(email);
+
   if (error) {
-    setMessage($('loginMessage'), error.message || 'Unable to send the sign-in link.', true);
+    setLoginHtml(`
+      <div class="notice-box error">
+        <strong>The sign-in email could not be sent.</strong>
+        ${escapeHtml(error.message || 'Please try again in a moment.')}
+      </div>
+    `);
   } else {
-    setMessage($('loginMessage'), 'Check your email and click the secure sign-in link.');
+    setLoginHtml(`
+      <div class="notice-box email-sent">
+        <strong>Sign-in email sent.</strong>
+        A secure sign-in link has been sent to
+        <strong>${escapeHtml(email)}</strong>
+        Check your inbox and spam/junk folder, then click the link to continue.
+        <br><br>
+        If this email address is not registered as an active Canal Watch volunteer,
+        the portal will tell you after you open the sign-in link.
+      </div>
+    `);
   }
 
   button.disabled = false;
@@ -502,16 +532,23 @@ function closeVolunteerContactForm() {
   $('volunteerContactStatus').innerHTML = '';
 }
 
-$('volunteerContactClose').onclick = closeVolunteerContactForm;
-$('volunteerContactCancel').onclick = closeVolunteerContactForm;
+if ($('volunteerContactClose')) {
+  $('volunteerContactClose').onclick = closeVolunteerContactForm;
+}
 
-$('volunteerContactBackdrop').addEventListener('click', event => {
-  if (event.target === $('volunteerContactBackdrop')) {
-    closeVolunteerContactForm();
-  }
-});
+if ($('volunteerContactCancel')) {
+  $('volunteerContactCancel').onclick = closeVolunteerContactForm;
+}
 
-$('volunteerContactForm').addEventListener('submit', async event => {
+if ($('volunteerContactBackdrop')) {
+  $('volunteerContactBackdrop').addEventListener('click', event => {
+    if (event.target === $('volunteerContactBackdrop')) {
+      closeVolunteerContactForm();
+    }
+  });
+}
+
+if ($('volunteerContactForm')) $('volunteerContactForm').addEventListener('submit', async event => {
   event.preventDefault();
 
   const sendButton = $('volunteerContactSend');
