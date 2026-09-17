@@ -107,6 +107,22 @@ function closestForecast(round, site) {
   return best;
 }
 
+function weatherIcon(code) {
+  code = Number(code);
+  if (code === 0) return '🌙';
+  if (code === 1) return '☀️';
+  if (code === 2 || code === 3) return '🌤️';
+  if (code === 5 || code === 6) return '🌫️';
+  if (code === 7 || code === 8) return '☁️';
+  if (code >= 9 && code <= 14) return '🌦️';
+  if (code === 15) return '🌧️';
+  if (code >= 16 && code <= 18) return '🌨️';
+  if (code >= 19 && code <= 21) return '🌨️';
+  if (code >= 22 && code <= 27) return '❄️';
+  if (code >= 28 && code <= 30) return '⛈️';
+  return '🌡️';
+}
+
 function weatherDescription(code) {
   var descriptions = {
     0:'Clear night',1:'Sunny',2:'Partly cloudy',3:'Partly cloudy',
@@ -180,7 +196,7 @@ function weatherMarkup(round, site) {
 
   if (!forecast) {
     return '<div class="canal-weather-interface" style="margin-top:6px">' +
-      '<small><strong>Expected weather at ' + weatherEscape(time) +
+      '<small>' + weatherIcon(null) + ' <strong>Expected weather at ' + weatherEscape(time) +
       ':</strong> Forecast not yet available</small></div>';
   }
 
@@ -194,7 +210,7 @@ function weatherMarkup(round, site) {
   if (isFinite(rain)) details.push(Math.round(rain) + '% chance of rain');
 
   return '<div class="canal-weather-interface" style="margin-top:6px">' +
-    '<small><strong>Expected weather at ' + weatherEscape(time) +
+    '<small>' + weatherIcon(forecast.weather_code) + ' <strong>Expected weather at ' + weatherEscape(time) +
     ':</strong> ' + weatherEscape(details.join(' · ')) + '</small></div>';
 }
 
