@@ -958,8 +958,9 @@ function openRound(id){
      </div>`,
     async()=>{
       const name=$('rName').value.trim();
-      const survey_date=$('rDate').value;
-      const status=$('rStatus').value;
+	const survey_date=$('rDate').value;
+	const survey_time=$('rTime').value||null;
+	const status=$('rStatus').value;
       const conducted_date=
         status==='conducted'
           ? $('rConductedDate').value
@@ -984,9 +985,10 @@ function openRound(id){
       const recurrence=$('rRec').value;
 
       const row={
-        name,
-        survey_date,
-        status,
+       name,
+       survey_date,
+       survey_time,
+       status,
         conducted_date,
         recurrence,
         recurrence_interval:Math.max(
