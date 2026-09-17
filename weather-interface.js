@@ -116,8 +116,7 @@ function weatherIcon(code) {
   if (code === 7 || code === 8) return '☁️';
   if (code >= 9 && code <= 14) return '🌦️';
   if (code === 15) return '🌧️';
-  if (code >= 16 && code <= 18) return '🌨️';
-  if (code >= 19 && code <= 21) return '🌨️';
+  if (code >= 16 && code <= 21) return '🌨️';
   if (code >= 22 && code <= 27) return '❄️';
   if (code >= 28 && code <= 30) return '⛈️';
   return '🌡️';
@@ -196,7 +195,7 @@ function weatherMarkup(round, site) {
 
   if (!forecast) {
     return '<div class="canal-weather-interface" style="margin-top:6px">' +
-      '<small>' + weatherIcon(null) + ' <strong>Expected weather at ' + weatherEscape(time) +
+      '<small>🌡️ <strong>Expected weather at ' + weatherEscape(time) +
       ':</strong> Forecast not yet available</small></div>';
   }
 
