@@ -8,7 +8,18 @@ const fmtDate=v=>new Date(v+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numer
 const today=()=>new Date().toISOString().slice(0,10);
 const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-let db={rounds:[],sites:[],teams:[],volunteers:[],roundSites:[],assignments:[],assignmentTeams:[],assignmentVolunteers:[]};
+let db={
+ rounds:[],
+ sites:[],
+ teams:[],
+ volunteers:[],
+ roundSites:[],
+ assignments:[],
+ assignmentTeams:[],
+ assignmentVolunteers:[],
+ weatherSites:[],
+ forecasts:[]
+};
 
 let leafletPromise=null;
 let openSiteMapKey=null;
