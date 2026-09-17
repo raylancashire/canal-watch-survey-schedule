@@ -8,7 +8,18 @@ const fmtDate=v=>new Date(v+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numer
 const today=()=>new Date().toISOString().slice(0,10);
 const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-let db={rounds:[],sites:[],teams:[],volunteers:[],roundSites:[],assignments:[],assignmentTeams:[],assignmentVolunteers:[]};
+let db={
+ rounds:[],
+ sites:[],
+ teams:[],
+ volunteers:[],
+ roundSites:[],
+ assignments:[],
+ assignmentTeams:[],
+ assignmentVolunteers:[],
+ weatherSites:[],
+ forecasts:[]
+};
 
 let leafletPromise=null;
 let openSiteMapKey=null;
@@ -527,20 +538,36 @@ function setupSiteMapDisclosures(){
 }
 
 
-async function load(){
- // Load the live FreshWater Watch assessment data in parallel with Supabase.
- const waterLoad=loadWaterQualityAssessments();
+async function loadWeatherForecasts(){
+ try{
+  const [siteResult,forecastResult]=await Promise.all([
+   supabase
+    .from('weather_monitoring_sites')
+    .select('id,site_name,latitude,longitude')
+    .eq('active',true),
 
- const queries=await Promise.all([
-  supabase.from('survey_rounds').select('*').eq('status','planned').gte('survey_date',today()).order('survey_date'),
-  supabase.from('survey_sites').select('*').eq('active',true),
-  supabase.from('project_teams').select('*').eq('active',true),
-  supabase.from('volunteers').select('id,name,active').eq('active',true),
-  supabase.from('survey_round_sites').select('*'),
-  supabase.from('site_assignments').select('*').neq('status','cancelled'),
-  supabase.from('assignment_teams').select('*'),
-  supabase.from('assignment_volunteers').select('*')
- ]);
+   supabase
+    .from('weather_forecasts')
+    .select('monitoring_site_id,forecast_for,temperature_c,weather_code,precipitation_probability,forecast_created_at')
+  ]);
+
+  if(siteResult.error) throw siteResult.error;
+  if(forecastResult.error) throw forecastResult.error;
+
+  db.weatherSites=siteResult.data||[];
+  db.forecasts=forecastResult.data||[];
+
+  console.log(
+   `Weather loaded: ${db.weatherSites.length} sites, ${db.forecasts.length} forecasts`
+  );
+
+ }catch(error){
+  console.warn(
+   'Weather forecast unavailable; Survey Scheduler will continue normally.',
+   error
+  );
+ }
+}
 
  const err=queries.find(q=>q.error)?.error;
  if(err){
