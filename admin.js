@@ -882,7 +882,8 @@ function openRound(id){
 
 <label class="field">
   Planned survey time
-  <input id="rTime" type="time">
+  <input id="rTime" type="time"
+         value="${r.survey_time ? String(r.survey_time).slice(0,5) : ''}">
 </label>
 
 <label class="field">
