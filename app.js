@@ -642,7 +642,7 @@ function row(r,a){
      </div>
    </td>
 
-   <td>${fmtDate(r.survey_date)}</td>
+   <td>${fmtDate(r.survey_date)}${r.survey_time ? ` · ${String(r.survey_time).slice(0,5)}` : ''}</td>
    <td class="assignment-column">${assigned}</td>
    <td><span class="status ${cls}">${label}</span></td>
    <td class="${isEmbed?'':'hidden'}">${isEmbed?contactHtml(a):''}</td>
