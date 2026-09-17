@@ -571,6 +571,9 @@ async function load(){
  // Load the live FreshWater Watch assessment data in parallel with Supabase.
  const waterLoad=loadWaterQualityAssessments();
 
+ // Load weather independently so it cannot block the Survey Scheduler.
+ loadWeatherForecasts();
+
  const queries=await Promise.all([
   supabase.from('survey_rounds').select('*').eq('status','planned').gte('survey_date',today()).order('survey_date'),
   supabase.from('survey_sites').select('*').eq('active',true),
