@@ -887,7 +887,6 @@ function openRound(id){
 </label>
 
 <label class="field">
-  Survey status
 
        <label class="field">
          Survey status
