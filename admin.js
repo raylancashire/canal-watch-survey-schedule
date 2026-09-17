@@ -876,9 +876,17 @@ function openRound(id){
        </label>
 
        <label class="field">
-         Planned survey date
-         <input id="rDate" type="date" value="${r.survey_date}">
-       </label>
+  Planned survey date
+  <input id="rDate" type="date" value="${r.survey_date}">
+</label>
+
+<label class="field">
+  Planned survey time
+  <input id="rTime" type="time">
+</label>
+
+<label class="field">
+  Survey status
 
        <label class="field">
          Survey status
