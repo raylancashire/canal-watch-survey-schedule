@@ -606,7 +606,48 @@ function nearestWeatherSite(site){
 
  return nearest;
 }
+function forecastForSurvey(r,site){
+ if(!r.survey_date || !r.survey_time || !site) return null;
 
+ const weatherSite=nearestWeatherSite(site);
+ if(!weatherSite) return null;
+
+ // Treat the survey date/time as local London time.
+ const surveyDateTime=new Date(
+  `${r.survey_date}T${String(r.survey_time).slice(0,5)}:00`
+ );
+
+ if(Number.isNaN(surveyDateTime.getTime())) return null;
+
+ const forecasts=db.forecasts.filter(f=>
+  Number(f.monitoring_site_id)===Number(weatherSite.id)
+ );
+
+ if(!forecasts.length) return null;
+
+ let nearest=null;
+ let smallestDifference=Infinity;
+
+ for(const forecast of forecasts){
+  const forecastTime=new Date(forecast.forecast_for);
+  if(Number.isNaN(forecastTime.getTime())) continue;
+
+  const difference=Math.abs(
+   forecastTime.getTime()-surveyDateTime.getTime()
+  );
+
+  if(difference<smallestDifference){
+   smallestDifference=difference;
+   nearest=forecast;
+  }
+ }
+
+ // Don't use a forecast from a substantially different period.
+ // Met Office forecasts are supplied in three-hour intervals.
+ if(smallestDifference > 2*60*60*1000) return null;
+
+ return nearest;
+}
 
 async function load(){
  // Load the live FreshWater Watch assessment data in parallel with Supabase.
