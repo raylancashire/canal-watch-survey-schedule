@@ -537,7 +537,36 @@ function setupSiteMapDisclosures(){
  });
 }
 
+async function loadWeatherForecasts(){
+ try{
+  const [siteResult,forecastResult]=await Promise.all([
+   supabase
+    .from('weather_monitoring_sites')
+    .select('id,site_name,latitude,longitude')
+    .eq('active',true),
 
+   supabase
+    .from('weather_forecasts')
+    .select('monitoring_site_id,forecast_for,temperature_c,weather_code,precipitation_probability,forecast_created_at')
+  ]);
+
+  if(siteResult.error) throw siteResult.error;
+  if(forecastResult.error) throw forecastResult.error;
+
+  db.weatherSites=siteResult.data||[];
+  db.forecasts=forecastResult.data||[];
+
+  console.log(
+   `Weather loaded: ${db.weatherSites.length} sites, ${db.forecasts.length} forecasts`
+  );
+
+ }catch(error){
+  console.warn(
+   'Weather forecast unavailable; Survey Scheduler will continue normally.',
+   error
+  );
+ }
+}
 async function load(){
  // Load the live FreshWater Watch assessment data in parallel with Supabase.
  const waterLoad=loadWaterQualityAssessments();
