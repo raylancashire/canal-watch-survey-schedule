@@ -567,6 +567,47 @@ async function loadWeatherForecasts(){
   );
  }
 }
+
+function weatherDistanceKm(lat1,lon1,lat2,lon2){
+ const toRad=v=>v*Math.PI/180;
+ const dLat=toRad(lat2-lat1);
+ const dLon=toRad(lon2-lon1);
+
+ const a=
+  Math.sin(dLat/2)**2+
+  Math.cos(toRad(lat1))*
+  Math.cos(toRad(lat2))*
+  Math.sin(dLon/2)**2;
+
+ return 6371*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function nearestWeatherSite(site){
+ if(!site || site.latitude==null || site.longitude==null) return null;
+
+ let nearest=null;
+ let nearestDistance=Infinity;
+
+ for(const weatherSite of db.weatherSites){
+  if(weatherSite.latitude==null || weatherSite.longitude==null) continue;
+
+  const distance=weatherDistanceKm(
+   Number(site.latitude),
+   Number(site.longitude),
+   Number(weatherSite.latitude),
+   Number(weatherSite.longitude)
+  );
+
+  if(distance<nearestDistance){
+   nearestDistance=distance;
+   nearest=weatherSite;
+  }
+ }
+
+ return nearest;
+}
+
+
 async function load(){
  // Load the live FreshWater Watch assessment data in parallel with Supabase.
  const waterLoad=loadWaterQualityAssessments();
