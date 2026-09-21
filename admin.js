@@ -253,14 +253,50 @@ function render(){
   bindRendered();
 }
 
+function londonTodayIso(){
+  const parts=new Intl.DateTimeFormat('en-GB',{
+    timeZone:'Europe/London',
+    year:'numeric',
+    month:'2-digit',
+    day:'2-digit'
+  }).formatToParts(new Date());
+
+  const get=type=>parts.find(part=>part.type===type)?.value||'';
+
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function roundAdminGroup(round){
+  if(round.status==='planned'){
+    return round.survey_date<londonTodayIso()
+      ? 'overdue'
+      : 'planned';
+  }
+
+  return round.status;
+}
+
 function renderRounds(){
-  const statuses=['planned','conducted','cancelled'];
+  const statuses=['planned','overdue','conducted','cancelled'];
+
+  const labels={
+    planned:'Planned',
+    overdue:'Overdue',
+    conducted:'Conducted',
+    cancelled:'Cancelled'
+  };
+
+  const emptyLabels={
+    planned:'No planned survey rounds.',
+    overdue:'No overdue survey rounds.',
+    conducted:'No conducted survey rounds.',
+    cancelled:'No cancelled survey rounds.'
+  };
 
   const tabs=`
     <div class="round-status-tabs" role="tablist" aria-label="Survey round status">
       ${statuses.map(status=>{
-        const label=status.charAt(0).toUpperCase()+status.slice(1);
-        const count=db.rounds.filter(r=>r.status===status).length;
+        const count=db.rounds.filter(r=>roundAdminGroup(r)===status).length;
 
         return `
           <button
@@ -269,13 +305,13 @@ function renderRounds(){
             data-round-status-tab="${status}"
             role="tab"
             aria-selected="${activeRoundStatusTab===status?'true':'false'}">
-            ${label}
+            ${labels[status]}
             <span class="round-status-count">${count}</span>
           </button>`;
       }).join('')}
     </div>`;
 
-  const filtered=db.rounds.filter(r=>r.status===activeRoundStatusTab);
+  const filtered=db.rounds.filter(r=>roundAdminGroup(r)===activeRoundStatusTab);
 
   $('roundList').innerHTML=
     tabs+
@@ -290,12 +326,18 @@ function renderRounds(){
                 ? ` • Conducted ${fmtDate(r.conducted_date)}`
                 : '';
 
+            const overdue=
+              roundAdminGroup(r)==='overdue'
+                ? ' • Overdue'
+                : '';
+
             return `
               <div class="record round-record">
                 <div class="record-main">
                   <strong>${esc(r.name)}</strong><br>
                   <small>
                     Planned ${fmtDate(r.survey_date)}
+                    ${overdue}
                     ${actual}
                     • ${recurrenceLabel(r)}
                     ${r.auto_repeat?' • Auto-repeat':''}
@@ -324,7 +366,7 @@ function renderRounds(){
                 </div>
               </div>`;
           }).join('')
-        : `<div class="empty-state">No ${activeRoundStatusTab} survey rounds.</div>`
+        : `<div class="empty-state">${emptyLabels[activeRoundStatusTab]||'No survey rounds.'}</div>`
     }</div>`;
 
   document.querySelectorAll('[data-round-status-tab]').forEach(button=>{
@@ -381,7 +423,12 @@ function renderRounds(){
         return;
       }
 
-      activeRoundStatusTab=newStatus;
+      const updatedRound={
+        ...round,
+        ...payload
+      };
+
+      activeRoundStatusTab=roundAdminGroup(updatedRound);
       await loadAll();
     };
   });
