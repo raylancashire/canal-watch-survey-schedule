@@ -704,14 +704,104 @@ function roundAssignments(r){
  );
 }
 
+function localDateParts(date=new Date()){
+ const parts=new Intl.DateTimeFormat('en-CA',{
+   timeZone:'Europe/London',
+   year:'numeric',
+   month:'2-digit',
+   day:'2-digit'
+ }).formatToParts(date);
+
+ const get=type=>Number(parts.find(p=>p.type===type)?.value);
+
+ return {
+   year:get('year'),
+   month:get('month'),
+   day:get('day')
+ };
+}
+
+function isoDateUTC(date){
+ return [
+   date.getUTCFullYear(),
+   String(date.getUTCMonth()+1).padStart(2,'0'),
+   String(date.getUTCDate()).padStart(2,'0')
+ ].join('-');
+}
+
+function currentLondonDateUTC(){
+ const p=localDateParts();
+ return new Date(Date.UTC(p.year,p.month-1,p.day));
+}
+
+function periodBounds(period){
+ const current=currentLondonDateUTC();
+ const day=current.getUTCDay();
+ const mondayOffset=day===0 ? -6 : 1-day;
+
+ const thisMonday=new Date(current);
+ thisMonday.setUTCDate(current.getUTCDate()+mondayOffset);
+
+ const thisSunday=new Date(thisMonday);
+ thisSunday.setUTCDate(thisMonday.getUTCDate()+6);
+
+ const nextMonday=new Date(thisMonday);
+ nextMonday.setUTCDate(thisMonday.getUTCDate()+7);
+
+ const nextSunday=new Date(nextMonday);
+ nextSunday.setUTCDate(nextMonday.getUTCDate()+6);
+
+ const nextMonthStart=new Date(Date.UTC(
+   current.getUTCFullYear(),
+   current.getUTCMonth()+1,
+   1
+ ));
+
+ const nextMonthEnd=new Date(Date.UTC(
+   current.getUTCFullYear(),
+   current.getUTCMonth()+2,
+   0
+ ));
+
+ if(period==='this-week'){
+   return [isoDateUTC(thisMonday),isoDateUTC(thisSunday)];
+ }
+
+ if(period==='next-week'){
+   return [isoDateUTC(nextMonday),isoDateUTC(nextSunday)];
+ }
+
+ if(period==='next-month'){
+   return [isoDateUTC(nextMonthStart),isoDateUTC(nextMonthEnd)];
+ }
+
+ return null;
+}
+
+function roundsForPeriod(period){
+ if(period==='all')return db.rounds;
+
+ const bounds=periodBounds(period);
+ if(!bounds)return db.rounds;
+
+ const [start,end]=bounds;
+
+ return db.rounds.filter(r=>
+   r.survey_date>=start &&
+   r.survey_date<=end
+ );
+}
+
 function renderFilter(){
- $('roundFilter').innerHTML='<option value="all">All upcoming surveys</option>'+
-   db.rounds.map(r=>`<option value="${r.id}">${escapeHtml(r.name)} — ${fmtDate(r.survey_date)}</option>`).join('');
+ $('roundFilter').innerHTML=`
+   <option value="all">All upcoming surveys</option>
+   <option value="this-week">This week</option>
+   <option value="next-week">Next week</option>
+   <option value="next-month">Next month</option>
+ `;
 
  $('roundFilter').onchange=()=>{
-   $('roundFilter').value==='all'
-     ? renderAll()
-     : renderOne(Number($('roundFilter').value));
+   renderPeriod($('roundFilter').value);
  };
 }
 
@@ -786,20 +876,30 @@ function stats(rounds){
  $('uncoveredCount').textContent=all.length-covered.length;
 }
 
-function renderAll(){
+function renderPeriod(period='all'){
  openSiteMapKey=null;
- const rows=db.rounds.flatMap(r=>roundAssignments(r).map(a=>row(r,a)));
- $('scheduleBody').innerHTML=rows.join('')||'<tr><td colspan="5">No upcoming surveys scheduled.</td></tr>';
- stats(db.rounds);
+
+ const rounds=roundsForPeriod(period);
+ const rows=rounds.flatMap(r=>
+   roundAssignments(r).map(a=>row(r,a))
+ );
+
+ const emptyText={
+   'this-week':'No surveys scheduled for this week.',
+   'next-week':'No surveys scheduled for next week.',
+   'next-month':'No surveys scheduled for next month.',
+   'all':'No upcoming surveys scheduled.'
+ }[period] || 'No upcoming surveys scheduled.';
+
+ $('scheduleBody').innerHTML=
+   rows.join('') ||
+   `<tr><td colspan="5">${emptyText}</td></tr>`;
+
+ stats(rounds);
 }
 
-function renderOne(id){
- openSiteMapKey=null;
- const r=db.rounds.find(x=>x.id===id);
- if(!r)return;
- const rows=roundAssignments(r).map(a=>row(r,a));
- $('scheduleBody').innerHTML=rows.join('')||'<tr><td colspan="5">No sites are attached to this survey round.</td></tr>';
- stats([r]);
+function renderAll(){
+ renderPeriod('all');
 }
 
 function setupCompactView(){
