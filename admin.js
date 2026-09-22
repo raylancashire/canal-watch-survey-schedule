@@ -23,6 +23,7 @@ let db={
 let currentAdmin=null;
 let modalSave=null;
 let activeRoundStatusTab='planned';
+let activeAssignmentTab='active';
 
 function message(el,text,error=false){
   el.innerHTML=text?`<div class="notice ${error?'error':''}">${esc(text)}</div>`:'';
@@ -196,34 +197,7 @@ function render(){
       </div>`;
   }).join('');
 
-  $('assignmentList').innerHTML=db.assignments.map(a=>{
-    const names=[
-      ...db.assignmentTeams
-        .filter(x=>x.assignment_id===a.id)
-        .map(x=>teamName(x.team_id)),
-      ...db.assignmentVolunteers
-        .filter(x=>x.assignment_id===a.id)
-        .map(x=>volunteerName(x.volunteer_id))
-    ];
-
-    return `
-      <div class="record">
-        <div>
-          <strong>${esc(roundName(a.survey_round_id))} — ${esc(siteName(a.survey_site_id))}</strong>
-          <div class="assignment-summary">
-            ${names.length
-              ? names.map(n=>`<span class="pill">${esc(n)}</span>`).join('')
-              : 'No assignment'}
-          </div>
-        </div>
-        <div>${esc(a.status)}</div>
-        <div></div>
-        <div class="record-actions">
-          <button class="secondary edit-assignment" data-id="${a.id}">Edit</button>
-          <button class="danger delete-assignment" data-id="${a.id}">Delete</button>
-        </div>
-      </div>`;
-  }).join('');
+  renderAssignments();
 
   if($('adminList')){
     $('adminList').innerHTML=currentAdmin?.can_manage_admins
@@ -253,49 +227,121 @@ function render(){
   bindRendered();
 }
 
-function londonTodayIso(){
+// UK-local calendar date; avoid moving items a day early/late due to UTC.
+function adminLondonToday(){
   const parts=new Intl.DateTimeFormat('en-GB',{
-    timeZone:'Europe/London',
-    year:'numeric',
-    month:'2-digit',
-    day:'2-digit'
+    timeZone:'Europe/London', year:'numeric',month:'2-digit',day:'2-digit'
   }).formatToParts(new Date());
-
-  const get=type=>parts.find(part=>part.type===type)?.value||'';
-
+  const get=part=>parts.find(p=>p.type===part)?.value||'';
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
-function roundAdminGroup(round){
-  if(round.status==='planned'){
-    return round.survey_date<londonTodayIso()
-      ? 'overdue'
-      : 'planned';
+function assignmentGroup(assignment,today=adminLondonToday()){
+  const round=db.rounds.find(r=>r.id===assignment.survey_round_id);
+  // Past and closed rounds always go to history regardless of coverage.
+  if(!round || round.survey_date<today ||
+     ['conducted','cancelled'].includes(String(round.status||'').toLowerCase())){
+    return 'passed';
   }
+  const hasPeople=db.assignmentTeams.some(x=>x.assignment_id===assignment.id) ||
+    db.assignmentVolunteers.some(x=>x.assignment_id===assignment.id);
+  const status=String(assignment.status||'').toLowerCase();
+  return hasPeople || ['covered','complete','completed'].includes(status)
+    ? 'covered' : 'active';
+}
 
+function renderAssignments(){
+  const today=adminLondonToday();
+  const groups=['active','covered','passed'];
+  const labels={active:'Active',covered:'Covered',passed:'Passed'};
+  const explanations={
+    active:'Upcoming surveys still needing a volunteer or team.',
+    covered:'Upcoming surveys with a volunteer or team assigned.',
+    passed:'Past surveys and conducted or cancelled rounds, retained for reference.'
+  };
+
+  const tabs=`<div class="round-status-tabs" role="tablist" aria-label="Site assignment groups">
+    ${groups.map(group=>`<button type="button"
+      class="round-status-tab ${activeAssignmentTab===group?'active':''}"
+      role="tab" aria-selected="${activeAssignmentTab===group?'true':'false'}"
+      data-assignment-tab="${group}">${labels[group]}
+      <span class="round-status-count">${db.assignments.filter(a=>assignmentGroup(a,today)===group).length}</span>
+    </button>`).join('')}</div>`;
+
+  const filtered=db.assignments
+    .filter(a=>assignmentGroup(a,today)===activeAssignmentTab)
+    .sort((a,b)=>{
+      const dateA=db.rounds.find(r=>r.id===a.survey_round_id)?.survey_date||'';
+      const dateB=db.rounds.find(r=>r.id===b.survey_round_id)?.survey_date||'';
+      return activeAssignmentTab==='passed'
+        ? dateB.localeCompare(dateA)
+        : dateA.localeCompare(dateB);
+    });
+
+  $('assignmentList').innerHTML=tabs+`
+    <p class="help-text" style="margin:8px 0 14px">${explanations[activeAssignmentTab]}</p>
+    <div class="round-status-list">${filtered.length?filtered.map(a=>{
+      const round=db.rounds.find(r=>r.id===a.survey_round_id);
+      const teams=db.assignmentTeams.filter(x=>x.assignment_id===a.id)
+        .map(x=>teamName(x.team_id));
+      const volunteers=db.assignmentVolunteers.filter(x=>x.assignment_id===a.id)
+        .map(x=>volunteerName(x.volunteer_id));
+      const names=[...teams,...volunteers];
+      const roundStatus=String(round?.status||'').toLowerCase();
+      const statusLabel=roundStatus==='cancelled'?'Cancelled':
+        roundStatus==='conducted'?'Conducted':
+        assignmentGroup(a,today)==='passed'?'Passed':
+        assignmentGroup(a,today)==='covered'?'Covered':'Assignment needed';
+      const surveyDate=round?.survey_date?fmtDate(round.survey_date):'Date unavailable';
+      const actualDate=roundStatus==='conducted'&&round?.conducted_date
+        ? `<br><small>Conducted: ${esc(fmtDate(round.conducted_date))}</small>`:'';
+      return `<div class="record">
+        <div>
+          <strong>${esc(siteName(a.survey_site_id))}</strong><br>
+          <small><strong>Survey:</strong> ${esc(round?.name||'Unknown survey')}</small><br>
+          <small><strong>Scheduled:</strong> ${esc(surveyDate)}</small>
+          ${actualDate}
+          <div class="assignment-summary" style="margin-top:8px">
+            ${names.length?names.map(n=>`<span class="pill">${esc(n)}</span>`).join(''):
+              '<small>No volunteers or teams assigned</small>'}
+          </div>
+        </div>
+        <div>${esc(statusLabel)}</div>
+        <div></div>
+        <div class="record-actions">
+          <button class="secondary edit-assignment" data-id="${a.id}">Edit</button>
+          <button class="danger delete-assignment" data-id="${a.id}">Delete</button>
+        </div>
+      </div>`;
+    }).join(''):`<div class="empty-state">No ${labels[activeAssignmentTab].toLowerCase()} assignments.</div>`}
+    </div>`;
+
+  document.querySelectorAll('[data-assignment-tab]').forEach(button=>{
+    button.onclick=()=>{
+      activeAssignmentTab=button.dataset.assignmentTab;
+      renderAssignments();
+    };
+  });
+  document.querySelectorAll('.edit-assignment').forEach(button=>{
+    button.onclick=()=>openAssignment(Number(button.dataset.id));
+  });
+  document.querySelectorAll('.delete-assignment').forEach(button=>{
+    button.onclick=()=>deleteAssignment(Number(button.dataset.id));
+  });
+}
+
+function roundAdminGroup(round){
+  if(round.status==='planned' && round.survey_date<adminLondonToday())return 'overdue';
   return round.status;
 }
 
 function renderRounds(){
   const statuses=['planned','overdue','conducted','cancelled'];
 
-  const labels={
-    planned:'Planned',
-    overdue:'Overdue',
-    conducted:'Conducted',
-    cancelled:'Cancelled'
-  };
-
-  const emptyLabels={
-    planned:'No planned survey rounds.',
-    overdue:'No overdue survey rounds.',
-    conducted:'No conducted survey rounds.',
-    cancelled:'No cancelled survey rounds.'
-  };
-
   const tabs=`
     <div class="round-status-tabs" role="tablist" aria-label="Survey round status">
       ${statuses.map(status=>{
+        const label=status.charAt(0).toUpperCase()+status.slice(1);
         const count=db.rounds.filter(r=>roundAdminGroup(r)===status).length;
 
         return `
@@ -305,7 +351,7 @@ function renderRounds(){
             data-round-status-tab="${status}"
             role="tab"
             aria-selected="${activeRoundStatusTab===status?'true':'false'}">
-            ${labels[status]}
+            ${label}
             <span class="round-status-count">${count}</span>
           </button>`;
       }).join('')}
@@ -326,18 +372,12 @@ function renderRounds(){
                 ? ` • Conducted ${fmtDate(r.conducted_date)}`
                 : '';
 
-            const overdue=
-              roundAdminGroup(r)==='overdue'
-                ? ' • Overdue'
-                : '';
-
             return `
               <div class="record round-record">
                 <div class="record-main">
                   <strong>${esc(r.name)}</strong><br>
                   <small>
                     Planned ${fmtDate(r.survey_date)}
-                    ${overdue}
                     ${actual}
                     • ${recurrenceLabel(r)}
                     ${r.auto_repeat?' • Auto-repeat':''}
@@ -366,7 +406,7 @@ function renderRounds(){
                 </div>
               </div>`;
           }).join('')
-        : `<div class="empty-state">${emptyLabels[activeRoundStatusTab]||'No survey rounds.'}</div>`
+        : `<div class="empty-state">No ${activeRoundStatusTab} survey rounds.</div>`
     }</div>`;
 
   document.querySelectorAll('[data-round-status-tab]').forEach(button=>{
@@ -423,12 +463,7 @@ function renderRounds(){
         return;
       }
 
-      const updatedRound={
-        ...round,
-        ...payload
-      };
-
-      activeRoundStatusTab=roundAdminGroup(updatedRound);
+      activeRoundStatusTab=roundAdminGroup({...round,...payload});
       await loadAll();
     };
   });
