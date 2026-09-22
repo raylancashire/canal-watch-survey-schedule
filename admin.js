@@ -238,9 +238,11 @@ function adminLondonToday(){
 
 function assignmentGroup(assignment,today=adminLondonToday()){
   const round=db.rounds.find(r=>r.id===assignment.survey_round_id);
-  // Past and closed rounds always go to history regardless of coverage.
+  // Conducted rounds have their own history tab, regardless of their planned date.
+  if(String(round?.status||'').toLowerCase()==='conducted')return 'conducted';
+  // Passed retains past planned rounds and cancelled rounds, even if cancelled early.
   if(!round || round.survey_date<today ||
-     ['conducted','cancelled'].includes(String(round.status||'').toLowerCase())){
+     String(round.status||'').toLowerCase()==='cancelled'){
     return 'passed';
   }
   const hasPeople=db.assignmentTeams.some(x=>x.assignment_id===assignment.id) ||
@@ -252,12 +254,13 @@ function assignmentGroup(assignment,today=adminLondonToday()){
 
 function renderAssignments(){
   const today=adminLondonToday();
-  const groups=['active','covered','passed'];
-  const labels={active:'Active',covered:'Covered',passed:'Passed'};
+  const groups=['active','covered','passed','conducted'];
+  const labels={active:'Active',covered:'Covered',passed:'Passed',conducted:'Conducted'};
   const explanations={
     active:'Upcoming surveys still needing a volunteer or team.',
     covered:'Upcoming surveys with a volunteer or team assigned.',
-    passed:'Past surveys and conducted or cancelled rounds, retained for reference.'
+    passed:'Past planned and cancelled rounds that were not marked conducted.',
+    conducted:'Assignments belonging to rounds explicitly marked Conducted.'
   };
 
   const tabs=`<div class="round-status-tabs" role="tablist" aria-label="Site assignment groups">
@@ -271,9 +274,15 @@ function renderAssignments(){
   const filtered=db.assignments
     .filter(a=>assignmentGroup(a,today)===activeAssignmentTab)
     .sort((a,b)=>{
-      const dateA=db.rounds.find(r=>r.id===a.survey_round_id)?.survey_date||'';
-      const dateB=db.rounds.find(r=>r.id===b.survey_round_id)?.survey_date||'';
-      return activeAssignmentTab==='passed'
+      const roundA=db.rounds.find(r=>r.id===a.survey_round_id);
+      const roundB=db.rounds.find(r=>r.id===b.survey_round_id);
+      const dateA=activeAssignmentTab==='conducted'
+        ? (roundA?.conducted_date||roundA?.survey_date||'')
+        : (roundA?.survey_date||'');
+      const dateB=activeAssignmentTab==='conducted'
+        ? (roundB?.conducted_date||roundB?.survey_date||'')
+        : (roundB?.survey_date||'');
+      return ['passed','conducted'].includes(activeAssignmentTab)
         ? dateB.localeCompare(dateA)
         : dateA.localeCompare(dateB);
     });
