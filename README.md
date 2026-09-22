@@ -46,13 +46,14 @@ Only active, authorised `admin_profiles` with `can_manage` can administer the sc
 
 ### Site Assignments
 
-The Site Assignments panel is now divided into **Active**, **Covered** and **Passed**, with counts:
+The Site Assignments panel is divided into **Unassigned**, **Covered**, **Passed** and **Conducted**, each with a count:
 
 | Tab | Meaning |
 | --- | --- |
-| **Active** | Upcoming assignments without an assigned volunteer/team and not marked covered |
+| **Unassigned** | Upcoming assignments without an assigned volunteer/team and not marked covered |
 | **Covered** | Upcoming assignments with volunteer/team coverage or an explicit covered/completed assignment status |
-| **Passed** | Past scheduled dates, plus assignments for Conducted or Cancelled rounds |
+| **Passed** | Past planned rounds not marked Conducted, plus Cancelled rounds |
+| **Conducted** | Assignments for rounds explicitly marked Conducted; sorted by actual conducted date where recorded, newest first |
 
 Each assignment shows its **sampling site, survey-round name, scheduled date, assigned volunteers/teams and current status**. Conducted dates appear where recorded. Existing Edit and Delete controls are retained. These groups are computed in the browser; **no SQL migration or new assignment status is required**.
 
@@ -87,7 +88,7 @@ Principal tables include `admin_profiles`, `volunteers`, `project_teams`, `proje
 
 ## Updating GitHub and Webador
 
-Replace only the files needed for each feature, keeping working maps, charts, filters and volunteer routes intact. For the **latest Site Assignments grouping and prior Overdue Survey Rounds change**, replace `admin.js` from the corresponding current package; no accompanying database or stylesheet changes were required. For the **date-period public dropdown**, replace `app.js` based on the current file rather than an older starter package. Updating this README does not itself deploy any JavaScript, SQL or Edge Function.
+Replace only the files needed for each feature, keeping working maps, charts, filters and volunteer routes intact. For the **latest four-tab Site Assignments grouping and prior Overdue Survey Rounds change**, replace `admin.js` from the corresponding current package; no accompanying database or stylesheet changes were required. For the **date-period public dropdown**, replace `app.js` based on the current file rather than an older starter package. Updating this README does not itself deploy any JavaScript, SQL or Edge Function.
 
 After publishing changes, verify on desktop and mobile: planned-only public list; week/month filter and summary cards; full-width maps, water pin/site/date; Webador `round`/`site` links and magic-link return; volunteer assignment safeguards; all four round tabs and three assignment tabs; correct visibility of completed and cancelled history. Use a hard refresh if GitHub Pages or Webador still shows cached code.
 

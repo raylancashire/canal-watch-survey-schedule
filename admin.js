@@ -255,7 +255,7 @@ function assignmentGroup(assignment,today=adminLondonToday()){
 function renderAssignments(){
   const today=adminLondonToday();
   const groups=['active','covered','passed','conducted'];
-  const labels={active:'Active',covered:'Covered',passed:'Passed',conducted:'Conducted'};
+  const labels={active:'Unassigned',covered:'Covered',passed:'Passed',conducted:'Conducted'};
   const explanations={
     active:'Upcoming surveys still needing a volunteer or team.',
     covered:'Upcoming surveys with a volunteer or team assigned.',
