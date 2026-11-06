@@ -24,6 +24,7 @@ let currentAdmin=null;
 let modalSave=null;
 let activeRoundStatusTab='planned';
 let activeAssignmentTab='active';
+let assignmentReportMode=false;
 
 function message(el,text,error=false){
   el.innerHTML=text?`<div class="notice ${error?'error':''}">${esc(text)}</div>`:'';
@@ -252,7 +253,145 @@ function assignmentGroup(assignment,today=adminLondonToday()){
     ? 'covered' : 'active';
 }
 
+
+function volunteerIdsForAssignment(assignmentId){
+  const ids=new Set();
+
+  db.assignmentVolunteers
+    .filter(x=>x.assignment_id===assignmentId)
+    .forEach(x=>ids.add(x.volunteer_id));
+
+  const teamIds=db.assignmentTeams
+    .filter(x=>x.assignment_id===assignmentId)
+    .map(x=>x.team_id);
+
+  db.members
+    .filter(m=>teamIds.includes(m.team_id))
+    .forEach(m=>ids.add(m.volunteer_id));
+
+  return ids;
+}
+
+function conductedSurveyReports(){
+  return db.rounds
+    .filter(r=>String(r.status||'').toLowerCase()==='conducted')
+    .map(round=>{
+      const assignments=db.assignments.filter(
+        a=>a.survey_round_id===round.id
+      );
+
+      const siteRows=assignments.map(a=>{
+        const volunteerIds=volunteerIdsForAssignment(a.id);
+
+        return {
+          assignmentId:a.id,
+          siteId:a.survey_site_id,
+          siteName:siteName(a.survey_site_id),
+          volunteerIds,
+          volunteerNames:[...volunteerIds]
+            .map(id=>volunteerName(id))
+            .sort((a,b)=>a.localeCompare(b))
+        };
+      });
+
+      const uniqueSites=new Set(
+        siteRows.map(row=>row.siteId)
+      );
+
+      const uniqueVolunteers=new Set();
+      siteRows.forEach(row=>{
+        row.volunteerIds.forEach(id=>uniqueVolunteers.add(id));
+      });
+
+      return {
+        round,
+        siteRows,
+        surveyedSiteCount:uniqueSites.size,
+        uniqueVolunteerCount:uniqueVolunteers.size
+      };
+    })
+    .sort((a,b)=>{
+      const dateA=a.round.conducted_date||a.round.survey_date||'';
+      const dateB=b.round.conducted_date||b.round.survey_date||'';
+      return dateB.localeCompare(dateA);
+    });
+}
+
+function renderAssignmentReport(){
+  const reports=conductedSurveyReports();
+
+  $('assignmentList').innerHTML=`
+    <div class="round-status-tabs" role="tablist" aria-label="Site assignment groups">
+      <button type="button" class="round-status-tab" data-return-assignment-tabs>
+        ← Site assignments
+      </button>
+      <button type="button" class="round-status-tab active" aria-selected="true">
+        Survey report
+      </button>
+    </div>
+
+    <p class="help-text" style="margin:8px 0 14px">
+      Conducted surveys only. Volunteer totals count each person once per survey,
+      including volunteers assigned through project teams.
+    </p>
+
+    <div class="round-status-list">
+      ${reports.length?reports.map(report=>{
+        const round=report.round;
+        const actualDate=round.conducted_date||round.survey_date;
+
+        return `
+          <div class="record survey-report-record" style="display:block">
+            <div style="display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap">
+              <div>
+                <strong>${esc(round.name)}</strong><br>
+                <small>Conducted: ${esc(fmtDate(actualDate))}</small>
+              </div>
+
+              <div class="assignment-summary" style="margin:0">
+                <span class="pill">
+                  ${report.surveyedSiteCount} site${report.surveyedSiteCount===1?'':'s'} surveyed
+                </span>
+                <span class="pill">
+                  ${report.uniqueVolunteerCount} unique volunteer${report.uniqueVolunteerCount===1?'':'s'}
+                </span>
+              </div>
+            </div>
+
+            <div style="margin-top:12px">
+              ${report.siteRows.length?report.siteRows.map(site=>`
+                <div style="padding:8px 0;border-top:1px solid #e5ebe7">
+                  <strong>${esc(site.siteName)}</strong>
+                  <span style="margin-left:6px">
+                    — ${site.volunteerIds.size} volunteer${site.volunteerIds.size===1?'':'s'}
+                  </span>
+                  ${site.volunteerNames.length
+                    ? `<div class="assignment-summary" style="margin-top:6px">
+                        ${site.volunteerNames.map(name=>`<span class="pill">${esc(name)}</span>`).join('')}
+                       </div>`
+                    : '<div><small>No volunteers recorded</small></div>'
+                  }
+                </div>
+              `).join('')
+              : '<div class="empty-state">No site assignments recorded for this conducted survey.</div>'}
+            </div>
+          </div>`;
+      }).join('')
+      : '<div class="empty-state">No conducted surveys are available for reporting.</div>'}
+    </div>`;
+
+  document.querySelector('[data-return-assignment-tabs]')?.addEventListener('click',()=>{
+    assignmentReportMode=false;
+    renderAssignments();
+  });
+}
+
 function renderAssignments(){
+  if(assignmentReportMode){
+    renderAssignmentReport();
+    return;
+  }
+
   const today=adminLondonToday();
   const groups=['active','covered','passed','conducted'];
   const labels={active:'Unassigned',covered:'Covered',passed:'Passed',conducted:'Conducted'};
@@ -269,7 +408,13 @@ function renderAssignments(){
       role="tab" aria-selected="${activeAssignmentTab===group?'true':'false'}"
       data-assignment-tab="${group}">${labels[group]}
       <span class="round-status-count">${db.assignments.filter(a=>assignmentGroup(a,today)===group).length}</span>
-    </button>`).join('')}</div>`;
+    </button>`).join('')}
+    <button type="button"
+      class="round-status-tab"
+      data-assignment-report>
+      Survey report
+    </button>
+  </div>`;
 
   const filtered=db.assignments
     .filter(a=>assignmentGroup(a,today)===activeAssignmentTab)
@@ -327,9 +472,15 @@ function renderAssignments(){
 
   document.querySelectorAll('[data-assignment-tab]').forEach(button=>{
     button.onclick=()=>{
+      assignmentReportMode=false;
       activeAssignmentTab=button.dataset.assignmentTab;
       renderAssignments();
     };
+  });
+
+  document.querySelector('[data-assignment-report]')?.addEventListener('click',()=>{
+    assignmentReportMode=true;
+    renderAssignmentReport();
   });
   document.querySelectorAll('.edit-assignment').forEach(button=>{
     button.onclick=()=>openAssignment(Number(button.dataset.id));
