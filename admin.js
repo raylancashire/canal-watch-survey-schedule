@@ -346,7 +346,11 @@ function siteParticipationTotals(reports){
       (total,report)=>total+report.surveyCount,
       0
     ),
-    uniqueVolunteers:uniqueVolunteerIds.size
+    uniqueVolunteers:uniqueVolunteerIds.size,
+    totalAttendances:reports.reduce(
+      (total,report)=>total+report.volunteerAttendances,
+      0
+    )
   };
 }
 
@@ -379,6 +383,9 @@ function renderAssignmentReport(){
       </span>
       <span class="pill">
         ${totals.uniqueVolunteers} unique volunteer${totals.uniqueVolunteers===1?'':'s'} overall
+      </span>
+      <span class="pill">
+        ${totals.totalAttendances} total attendance${totals.totalAttendances===1?'':'s'}
       </span>
     </div>
 
