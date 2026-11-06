@@ -272,53 +272,64 @@ function volunteerIdsForAssignment(assignmentId){
   return ids;
 }
 
-function conductedSurveyReports(){
-  return db.rounds
-    .filter(r=>String(r.status||'').toLowerCase()==='conducted')
-    .map(round=>{
-      const assignments=db.assignments.filter(
-        a=>a.survey_round_id===round.id
-      );
+function siteParticipationReports(){
+  const conductedRounds=db.rounds.filter(
+    r=>String(r.status||'').toLowerCase()==='conducted'
+  );
 
-      const siteRows=assignments.map(a=>{
-        const volunteerIds=volunteerIdsForAssignment(a.id);
-
-        return {
-          assignmentId:a.id,
-          siteId:a.survey_site_id,
-          siteName:siteName(a.survey_site_id),
-          volunteerIds,
-          volunteerNames:[...volunteerIds]
-            .map(id=>volunteerName(id))
-            .sort((a,b)=>a.localeCompare(b))
-        };
+  return db.sites
+    .map(site=>{
+      const siteAssignments=db.assignments.filter(a=>{
+        if(a.survey_site_id!==site.id)return false;
+        return conductedRounds.some(r=>r.id===a.survey_round_id);
       });
 
-      const uniqueSites=new Set(
-        siteRows.map(row=>row.siteId)
-      );
+      const uniqueSurveyIds=new Set(siteAssignments.map(a=>a.survey_round_id));
+      const uniqueVolunteerIds=new Set();
+      let volunteerAttendances=0;
 
-      const uniqueVolunteers=new Set();
-      siteRows.forEach(row=>{
-        row.volunteerIds.forEach(id=>uniqueVolunteers.add(id));
-      });
+      const surveyRows=siteAssignments
+        .map(a=>{
+          const round=conductedRounds.find(r=>r.id===a.survey_round_id);
+          const volunteerIds=volunteerIdsForAssignment(a.id);
+
+          volunteerIds.forEach(id=>uniqueVolunteerIds.add(id));
+          volunteerAttendances+=volunteerIds.size;
+
+          return {
+            assignmentId:a.id,
+            round,
+            volunteerIds,
+            volunteerNames:[...volunteerIds]
+              .map(id=>volunteerName(id))
+              .sort((a,b)=>a.localeCompare(b))
+          };
+        })
+        .sort((a,b)=>{
+          const dateA=a.round?.conducted_date||a.round?.survey_date||'';
+          const dateB=b.round?.conducted_date||b.round?.survey_date||'';
+          return dateB.localeCompare(dateA);
+        });
 
       return {
-        round,
-        siteRows,
-        surveyedSiteCount:uniqueSites.size,
-        uniqueVolunteerCount:uniqueVolunteers.size
+        site,
+        surveyCount:uniqueSurveyIds.size,
+        uniqueVolunteerCount:uniqueVolunteerIds.size,
+        volunteerAttendances,
+        surveyRows
       };
     })
+    .filter(report=>report.surveyCount>0)
     .sort((a,b)=>{
-      const dateA=a.round.conducted_date||a.round.survey_date||'';
-      const dateB=b.round.conducted_date||b.round.survey_date||'';
-      return dateB.localeCompare(dateA);
+      if(b.surveyCount!==a.surveyCount){
+        return b.surveyCount-a.surveyCount;
+      }
+      return a.site.name.localeCompare(b.site.name);
     });
 }
 
 function renderAssignmentReport(){
-  const reports=conductedSurveyReports();
+  const reports=siteParticipationReports();
 
   $('assignmentList').innerHTML=`
     <div class="round-status-tabs" role="tablist" aria-label="Site assignment groups">
@@ -326,58 +337,70 @@ function renderAssignmentReport(){
         ← Site assignments
       </button>
       <button type="button" class="round-status-tab active" aria-selected="true">
-        Survey report
+        Site report
       </button>
     </div>
 
     <p class="help-text" style="margin:8px 0 14px">
-      Conducted surveys only. Volunteer totals count each person once per survey,
-      including volunteers assigned through project teams.
+      Conducted surveys only. Unique volunteers include people assigned directly
+      and through project teams. Volunteer attendances count each person's
+      participation in each conducted survey at that site.
     </p>
 
     <div class="round-status-list">
-      ${reports.length?reports.map(report=>{
-        const round=report.round;
-        const actualDate=round.conducted_date||round.survey_date;
-
-        return `
-          <div class="record survey-report-record" style="display:block">
+      ${reports.length?reports.map(report=>`
+        <details class="record survey-report-record" style="display:block">
+          <summary style="cursor:pointer;list-style:none">
             <div style="display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap">
               <div>
-                <strong>${esc(round.name)}</strong><br>
-                <small>Conducted: ${esc(fmtDate(actualDate))}</small>
+                <strong>${esc(report.site.name)}</strong>
               </div>
 
               <div class="assignment-summary" style="margin:0">
                 <span class="pill">
-                  ${report.surveyedSiteCount} site${report.surveyedSiteCount===1?'':'s'} surveyed
+                  ${report.surveyCount} survey${report.surveyCount===1?'':'s'}
                 </span>
                 <span class="pill">
                   ${report.uniqueVolunteerCount} unique volunteer${report.uniqueVolunteerCount===1?'':'s'}
                 </span>
+                <span class="pill">
+                  ${report.volunteerAttendances} attendance${report.volunteerAttendances===1?'':'s'}
+                </span>
               </div>
             </div>
+          </summary>
 
-            <div style="margin-top:12px">
-              ${report.siteRows.length?report.siteRows.map(site=>`
+          <div style="margin-top:12px">
+            ${report.surveyRows.map(row=>{
+              const date=row.round?.conducted_date||row.round?.survey_date;
+
+              return `
                 <div style="padding:8px 0;border-top:1px solid #e5ebe7">
-                  <strong>${esc(site.siteName)}</strong>
+                  <strong>${esc(row.round?.name||'Survey')}</strong>
                   <span style="margin-left:6px">
-                    — ${site.volunteerIds.size} volunteer${site.volunteerIds.size===1?'':'s'}
+                    — ${esc(fmtDate(date))}
                   </span>
-                  ${site.volunteerNames.length
+
+                  <div style="margin-top:4px">
+                    <small>
+                      ${row.volunteerIds.size} volunteer${row.volunteerIds.size===1?'':'s'}
+                    </small>
+                  </div>
+
+                  ${row.volunteerNames.length
                     ? `<div class="assignment-summary" style="margin-top:6px">
-                        ${site.volunteerNames.map(name=>`<span class="pill">${esc(name)}</span>`).join('')}
+                        ${row.volunteerNames
+                          .map(name=>`<span class="pill">${esc(name)}</span>`)
+                          .join('')}
                        </div>`
                     : '<div><small>No volunteers recorded</small></div>'
                   }
-                </div>
-              `).join('')
-              : '<div class="empty-state">No site assignments recorded for this conducted survey.</div>'}
-            </div>
-          </div>`;
-      }).join('')
-      : '<div class="empty-state">No conducted surveys are available for reporting.</div>'}
+                </div>`;
+            }).join('')}
+          </div>
+        </details>
+      `).join('')
+      : '<div class="empty-state">No conducted site surveys are available for reporting.</div>'}
     </div>`;
 
   document.querySelector('[data-return-assignment-tabs]')?.addEventListener('click',()=>{
@@ -412,7 +435,7 @@ function renderAssignments(){
     <button type="button"
       class="round-status-tab"
       data-assignment-report>
-      Survey report
+      Site report
     </button>
   </div>`;
 
