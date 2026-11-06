@@ -328,8 +328,33 @@ function siteParticipationReports(){
     });
 }
 
+
+function siteParticipationTotals(reports){
+  const uniqueVolunteerIds=new Set();
+  const uniqueSurveyIds=new Set();
+
+  reports.forEach(report=>{
+    report.surveyRows.forEach(row=>{
+      if(row.round?.id){
+        uniqueSurveyIds.add(row.round.id);
+      }
+
+      row.volunteerIds.forEach(id=>{
+        uniqueVolunteerIds.add(id);
+      });
+    });
+  });
+
+  return {
+    sitesSurveyed:reports.length,
+    surveysConducted:uniqueSurveyIds.size,
+    uniqueVolunteers:uniqueVolunteerIds.size
+  };
+}
+
 function renderAssignmentReport(){
   const reports=siteParticipationReports();
+  const totals=siteParticipationTotals(reports);
 
   $('assignmentList').innerHTML=`
     <div class="round-status-tabs" role="tablist" aria-label="Site assignment groups">
@@ -346,6 +371,18 @@ function renderAssignmentReport(){
       and through project teams. Volunteer attendances count each person's
       participation in each conducted survey at that site.
     </p>
+
+    <div class="assignment-summary" style="margin:0 0 16px">
+      <span class="pill">
+        ${totals.sitesSurveyed} site${totals.sitesSurveyed===1?'':'s'} surveyed
+      </span>
+      <span class="pill">
+        ${totals.surveysConducted} conducted survey${totals.surveysConducted===1?'':'s'}
+      </span>
+      <span class="pill">
+        ${totals.uniqueVolunteers} unique volunteer${totals.uniqueVolunteers===1?'':'s'} overall
+      </span>
+    </div>
 
     <div class="round-status-list">
       ${reports.length?reports.map(report=>`
