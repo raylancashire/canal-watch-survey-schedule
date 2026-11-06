@@ -331,14 +331,9 @@ function siteParticipationReports(){
 
 function siteParticipationTotals(reports){
   const uniqueVolunteerIds=new Set();
-  const uniqueSurveyIds=new Set();
 
   reports.forEach(report=>{
     report.surveyRows.forEach(row=>{
-      if(row.round?.id){
-        uniqueSurveyIds.add(row.round.id);
-      }
-
       row.volunteerIds.forEach(id=>{
         uniqueVolunteerIds.add(id);
       });
@@ -347,7 +342,10 @@ function siteParticipationTotals(reports){
 
   return {
     sitesSurveyed:reports.length,
-    surveysConducted:uniqueSurveyIds.size,
+    siteSurveysConducted:reports.reduce(
+      (total,report)=>total+report.surveyCount,
+      0
+    ),
     uniqueVolunteers:uniqueVolunteerIds.size
   };
 }
@@ -377,7 +375,7 @@ function renderAssignmentReport(){
         ${totals.sitesSurveyed} site${totals.sitesSurveyed===1?'':'s'} surveyed
       </span>
       <span class="pill">
-        ${totals.surveysConducted} conducted survey${totals.surveysConducted===1?'':'s'}
+        ${totals.siteSurveysConducted} conducted site survey${totals.siteSurveysConducted===1?'':'s'}
       </span>
       <span class="pill">
         ${totals.uniqueVolunteers} unique volunteer${totals.uniqueVolunteers===1?'':'s'} overall
